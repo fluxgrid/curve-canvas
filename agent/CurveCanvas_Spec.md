@@ -50,8 +50,8 @@ The editor operates within a single, unified sandbox scene to eliminate loading 
 * **State 2: Action Mode (Live Test)**
   * **Trigger:** User presses the "Play" toggle.
   * **Initialization:** 1. The editor finds the nearest `Curve3D` point to the user's cursor ("Test From Here").
-    2. The KCC is teleported to that coordinate, given a baseline velocity, and unpaused.
-    3. The Action Camera (`Camera3D` attached to the KCC) becomes the active viewport.
+	2. The KCC is teleported to that coordinate, given a baseline velocity, and unpaused.
+	3. The Action Camera (`Camera3D` attached to the KCC) becomes the active viewport.
   * **Interaction:** UI tools vanish; standard game inputs are routed directly to the KCC.
 * **State 3: The Revert Hook & Trajectory Ghost**
   * **Execution:** The Action Camera deactivates, returning the viewport precisely to where the Architect Camera was left. The KCC is immediately hidden.
