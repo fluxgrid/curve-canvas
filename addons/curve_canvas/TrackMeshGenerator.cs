@@ -55,6 +55,7 @@ public partial class TrackMeshGenerator : Path3D
         EnsureMeshInstance();
         SubscribeToCurve();
         MarkMeshDirty();
+        GenerateTrackMesh();
         SetProcess(Engine.IsEditorHint());
     }
 
@@ -206,12 +207,12 @@ public partial class TrackMeshGenerator : Path3D
                 int currRight = vertexIndex + 1;
 
                 surfaceTool.AddIndex(prevLeft);
-                surfaceTool.AddIndex(currLeft);
                 surfaceTool.AddIndex(prevRight);
+                surfaceTool.AddIndex(currLeft);
 
                 surfaceTool.AddIndex(prevRight);
-                surfaceTool.AddIndex(currLeft);
                 surfaceTool.AddIndex(currRight);
+                surfaceTool.AddIndex(currLeft);
             }
 
             vertexIndex += 2;
