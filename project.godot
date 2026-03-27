@@ -18,3 +18,7 @@ config/features=PackedStringArray("4.6", "C#")
 
 project/assembly_name="CurveCanvas"
 project/solution_dir="."
+
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/curve_canvas/plugin.cfg")
