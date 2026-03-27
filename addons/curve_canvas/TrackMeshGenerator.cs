@@ -1,227 +1,108 @@
 using Godot;
+using System;
 
-namespace CurveCanvas.Editor;
-
-/// <summary>
-/// Procedurally generates a flat 2.5D track mesh along the assigned Curve3D.
-/// </summary>
 [Tool]
 public partial class TrackMeshGenerator : Path3D
 {
-    private const string MeshNodeName = "GeneratedTrackMesh";
+    [Export] public float TrackWidth { get; set; } = 6.0f;
+    [Export] public float TextureScale { get; set; } = 1.0f;
 
-    private MeshInstance3D? _meshInstance;
-    private Curve3D? _subscribedCurve;
-    private bool _meshDirty = true;
-    private float _trackWidth = 6.0f;
-    private float _textureScale = 1.0f;
-
-    [Export(PropertyHint.Range, "0.1,100,0.1")]
-    public float TrackWidth
-    {
-        get => _trackWidth;
-        set
-        {
-            var clamped = Mathf.Max(0.1f, value);
-            if (Mathf.IsEqualApprox(_trackWidth, clamped))
-            {
-                return;
-            }
-
-            _trackWidth = clamped;
-            MarkMeshDirty();
-        }
-    }
-
-    [Export(PropertyHint.Range, "0.1,100,0.1")]
-    public float TextureScale
-    {
-        get => _textureScale;
-        set
-        {
-            var clamped = Mathf.Max(0.1f, value);
-            if (Mathf.IsEqualApprox(_textureScale, clamped))
-            {
-                return;
-            }
-
-            _textureScale = clamped;
-            MarkMeshDirty();
-        }
-    }
+    private MeshInstance3D _meshInstance;
 
     public override void _Ready()
     {
         EnsureMeshInstance();
-        SubscribeToCurve();
-        MarkMeshDirty();
+        if (Curve != null)
+        {
+            Curve.Changed += OnCurveChanged;
+        }
         GenerateTrackMesh();
-        SetProcess(Engine.IsEditorHint());
-    }
-
-    public override void _ExitTree()
-    {
-        base._ExitTree();
-        UnsubscribeFromCurve();
-    }
-
-    public override void _Process(double delta)
-    {
-        if (!Engine.IsEditorHint())
-        {
-            SetProcess(false);
-            return;
-        }
-
-        if (_subscribedCurve != Curve)
-        {
-            SubscribeToCurve();
-        }
-
-        if (_meshDirty)
-        {
-            GenerateTrackMesh();
-            _meshDirty = false;
-        }
-    }
-
-    private void EnsureMeshInstance()
-    {
-        _meshInstance = GetNodeOrNull<MeshInstance3D>(MeshNodeName);
-        if (_meshInstance != null)
-        {
-            return;
-        }
-
-        _meshInstance = new MeshInstance3D
-        {
-            Name = MeshNodeName
-        };
-
-        AddChild(_meshInstance);
-        if (Engine.IsEditorHint())
-        {
-            var owner = GetTree()?.EditedSceneRoot ?? GetOwner();
-            if (owner != null)
-            {
-                _meshInstance.Owner = owner;
-            }
-        }
-    }
-
-    private void SubscribeToCurve()
-    {
-        UnsubscribeFromCurve();
-
-        if (Curve == null)
-        {
-            return;
-        }
-
-        _subscribedCurve = Curve;
-        _subscribedCurve.Changed += OnCurveChanged;
-    }
-
-    private void UnsubscribeFromCurve()
-    {
-        if (_subscribedCurve != null)
-        {
-            _subscribedCurve.Changed -= OnCurveChanged;
-        }
-
-        _subscribedCurve = null;
     }
 
     private void OnCurveChanged()
     {
-        MarkMeshDirty();
+        GenerateTrackMesh();
     }
 
-    private void MarkMeshDirty()
+    private void EnsureMeshInstance()
     {
-        _meshDirty = true;
-        if (Engine.IsEditorHint())
+        if (_meshInstance == null)
         {
-            SetProcess(true);
+            foreach (Node child in GetChildren())
+            {
+                if (child is MeshInstance3D mi && child.Name == "TrackMesh")
+                {
+                    _meshInstance = mi;
+                    return;
+                }
+            }
+
+            _meshInstance = new MeshInstance3D();
+            _meshInstance.Name = "TrackMesh";
+            
+            AddChild(_meshInstance);
+
+            if (Engine.IsEditorHint() && IsInsideTree())
+            {
+                _meshInstance.Owner = GetTree().EditedSceneRoot;
+            }
         }
     }
 
     private void GenerateTrackMesh()
     {
-        EnsureMeshInstance();
-
-        if (Curve == null || _meshInstance == null)
+        if (Curve == null || Curve.GetBakedPoints().Length < 2)
         {
-            return;
-        }
-
-        var bakedPoints = Curve.GetBakedPoints();
-        if (bakedPoints.Length < 2)
-        {
-            _meshInstance.Mesh = null;
+            if (_meshInstance != null) _meshInstance.Mesh = null;
             return;
         }
 
         var surfaceTool = new SurfaceTool();
         surfaceTool.Begin(Mesh.PrimitiveType.Triangles);
 
-        float cumulativeDistance = 0f;
-        Vector3 previousPoint = default;
-        bool hasPreviousPoint = false;
-        int vertexIndex = 0;
+        Vector3[] bakedPoints = Curve.GetBakedPoints();
+        float distance = 0.0f;
 
-        foreach (var rawPoint in bakedPoints)
+        for (int i = 0; i < bakedPoints.Length; i++)
         {
-            var planarPoint = new Vector3(rawPoint.X, rawPoint.Y, 0f);
+            Vector3 currentPoint = bakedPoints[i];
+            currentPoint.Z = 0;
 
-            if (hasPreviousPoint)
+            if (i > 0)
             {
-                cumulativeDistance += planarPoint.DistanceTo(previousPoint);
-            }
-            else
-            {
-                hasPreviousPoint = true;
-            }
-
-            previousPoint = planarPoint;
-
-            var halfWidth = _trackWidth * 0.5f;
-            var leftVertex = new Vector3(planarPoint.X, planarPoint.Y, -halfWidth);
-            var rightVertex = new Vector3(planarPoint.X, planarPoint.Y, halfWidth);
-
-            var distanceV = cumulativeDistance / _textureScale;
-            var leftUv = new Vector2(0f, distanceV);
-            var rightUv = new Vector2(1f, distanceV);
-
-            surfaceTool.SetUV(leftUv);
-            surfaceTool.AddVertex(leftVertex);
-
-            surfaceTool.SetUV(rightUv);
-            surfaceTool.AddVertex(rightVertex);
-
-            if (vertexIndex >= 2)
-            {
-                int prevLeft = vertexIndex - 2;
-                int prevRight = vertexIndex - 1;
-                int currLeft = vertexIndex;
-                int currRight = vertexIndex + 1;
-
-                surfaceTool.AddIndex(prevLeft);
-                surfaceTool.AddIndex(prevRight);
-                surfaceTool.AddIndex(currLeft);
-
-                surfaceTool.AddIndex(prevRight);
-                surfaceTool.AddIndex(currRight);
-                surfaceTool.AddIndex(currLeft);
+                Vector3 prevPoint = bakedPoints[i - 1];
+                prevPoint.Z = 0;
+                distance += currentPoint.DistanceTo(prevPoint);
             }
 
-            vertexIndex += 2;
+            float vCoord = TextureScale > 0 ? distance / TextureScale : 0;
+
+            surfaceTool.SetUV(new Vector2(0f, vCoord));
+            surfaceTool.AddVertex(new Vector3(currentPoint.X, currentPoint.Y, -TrackWidth / 2.0f));
+
+            surfaceTool.SetUV(new Vector2(1f, vCoord));
+            surfaceTool.AddVertex(new Vector3(currentPoint.X, currentPoint.Y, TrackWidth / 2.0f));
+        }
+
+        for (int i = 0; i < bakedPoints.Length - 1; i++)
+        {
+            int prevLeft = i * 2;
+            int prevRight = i * 2 + 1;
+            int currLeft = (i + 1) * 2;
+            int currRight = (i + 1) * 2 + 1;
+
+            surfaceTool.AddIndex(prevLeft);
+            surfaceTool.AddIndex(prevRight);
+            surfaceTool.AddIndex(currLeft);
+
+            surfaceTool.AddIndex(prevRight);
+            surfaceTool.AddIndex(currRight);
+            surfaceTool.AddIndex(currLeft);
         }
 
         surfaceTool.GenerateNormals();
         surfaceTool.GenerateTangents();
 
-        var mesh = surfaceTool.Commit();
-        _meshInstance.Mesh = mesh;
+        _meshInstance.Mesh = surfaceTool.Commit();
     }
 }
