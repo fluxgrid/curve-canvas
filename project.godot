@@ -1,0 +1,13 @@
+; Engine configuration file.
+; It is best edited using the Godot editor.
+;
+; Format: https://docs.godotengine.org/en/stable/tutorials/project_settings/project_settings_file.html
+
+config_version=5
+
+[application]
+config/name="CurveCanvas"
+
+[dotnet]
+project/assembly_name="CurveCanvas"
+project/solution_dir="."
