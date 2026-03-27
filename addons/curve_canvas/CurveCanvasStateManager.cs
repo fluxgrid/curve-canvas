@@ -20,16 +20,16 @@ public partial class CurveCanvasStateManager : Node
     public EditorState CurrentState => _currentState;
 
     [Export]
-    public NodePath ArchitectCameraPath { get; set; } = NodePath.Empty;
+    public NodePath ArchitectCameraPath { get; set; } = new();
 
     [Export]
-    public NodePath ActionCameraPath { get; set; } = NodePath.Empty;
+    public NodePath ActionCameraPath { get; set; } = new();
 
     [Export]
-    public NodePath TrackPathNodePath { get; set; } = NodePath.Empty;
+    public NodePath TrackPathNodePath { get; set; } = new();
 
     [Export]
-    public NodePath HostCharacterPath { get; set; } = NodePath.Empty;
+    public NodePath HostCharacterPath { get; set; } = new();
 
     private Camera3D? _architectCamera;
     private Camera3D? _actionCamera;

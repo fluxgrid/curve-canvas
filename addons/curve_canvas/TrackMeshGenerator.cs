@@ -12,7 +12,6 @@ public partial class TrackMeshGenerator : Path3D
 
     private MeshInstance3D? _meshInstance;
     private Curve3D? _subscribedCurve;
-    private Callable? _curveChangedCallable;
     private bool _meshDirty = true;
     private float _trackWidth = 6.0f;
     private float _textureScale = 1.0f;
@@ -119,19 +118,17 @@ public partial class TrackMeshGenerator : Path3D
         }
 
         _subscribedCurve = Curve;
-        _curveChangedCallable = Callable.From(OnCurveChanged);
-        _subscribedCurve.Changed += _curveChangedCallable.Value;
+        _subscribedCurve.Changed += OnCurveChanged;
     }
 
     private void UnsubscribeFromCurve()
     {
-        if (_subscribedCurve != null && _curveChangedCallable.HasValue)
+        if (_subscribedCurve != null)
         {
-            _subscribedCurve.Changed -= _curveChangedCallable.Value;
+            _subscribedCurve.Changed -= OnCurveChanged;
         }
 
         _subscribedCurve = null;
-        _curveChangedCallable = null;
     }
 
     private void OnCurveChanged()

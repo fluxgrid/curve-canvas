@@ -1,0 +1,33 @@
+[gd_scene load_steps=5 format=3 uid="uid://d06d84d665914848a064c3ea"]
+
+[ext_resource type="Script" path="res://addons/curve_canvas/TrackMeshGenerator.cs" id="1"]
+[ext_resource type="Script" path="res://addons/curve_canvas/CurveCanvasStateManager.cs" id="2"]
+[ext_resource type="Script" path="res://addons/curve_canvas/TrajectoryGhostRenderer.cs" id="3"]
+
+[sub_resource type="Curve3D" id="Curve3D_1"]
+points = PackedVector3Array(-20, 0, 0, 0, 5, 0, 30, -2, 0)
+
+[node name="CurveCanvasDemo" type="Node3D"]
+
+[node name="TrackGenerator" type="Path3D" parent="." script="ExtResource(1)"]
+curve = SubResource("Curve3D_1")
+
+[node name="ArchitectCamera" type="Camera3D" parent="."]
+position = Vector3(0, 50, 50)
+rotation_degrees = Vector3(-45, 0, 0)
+
+[node name="TestKCC" type="CharacterBody3D" parent="."]
+
+[node name="ActionCamera" type="Camera3D" parent="TestKCC"]
+position = Vector3(0, 2, 5)
+rotation_degrees = Vector3(-15, 0, 0)
+
+[node name="StateManager" type="Node" parent="." script="ExtResource(2)"]
+ArchitectCameraPath = NodePath("../ArchitectCamera")
+ActionCameraPath = NodePath("../TestKCC/ActionCamera")
+TrackPathNodePath = NodePath("../TrackGenerator")
+HostCharacterPath = NodePath("../TestKCC")
+
+[node name="TrajectoryGhost" type="Node3D" parent="." script="ExtResource(3)"]
+HostCharacterPath = NodePath("../TestKCC")
+StateManagerPath = NodePath("../StateManager")

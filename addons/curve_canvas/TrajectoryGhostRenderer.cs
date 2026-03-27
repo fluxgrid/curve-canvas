@@ -10,10 +10,10 @@ namespace CurveCanvas.Editor;
 public partial class TrajectoryGhostRenderer : Node3D
 {
     [Export]
-    public NodePath HostCharacterPath { get; set; } = NodePath.Empty;
+    public NodePath HostCharacterPath { get; set; } = new();
 
     [Export]
-    public NodePath StateManagerPath { get; set; } = NodePath.Empty;
+    public NodePath StateManagerPath { get; set; } = new();
 
     private readonly List<Vector3> _recordedPositions = new();
 
