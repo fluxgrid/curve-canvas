@@ -1,0 +1,19 @@
+# Godot editor metadata
+.godot/
+.import/
+
+# Export presets are regenerated per developer
+export.cfg
+export_presets.cfg
+
+# Mono/C# artifacts
+.mono/
+.vs/
+*.csproj.user
+*.suo
+*.user
+
+# General tooling
+.DS_Store
+.idea/
+.vscode/
