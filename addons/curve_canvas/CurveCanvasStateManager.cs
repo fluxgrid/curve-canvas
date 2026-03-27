@@ -1,3 +1,4 @@
+using System;
 using Godot;
 
 namespace CurveCanvas.Editor;
@@ -8,11 +9,15 @@ namespace CurveCanvas.Editor;
 [Tool]
 public partial class CurveCanvasStateManager : Node
 {
+    public event Action<EditorState>? StateChanged;
+
     public enum EditorState
     {
         Architect,
         Action
     }
+
+    public EditorState CurrentState => _currentState;
 
     [Export]
     public NodePath ArchitectCameraPath { get; set; } = NodePath.Empty;
@@ -35,7 +40,7 @@ public partial class CurveCanvasStateManager : Node
     public override void _Ready()
     {
         RefreshNodeReferences();
-        ApplyState(force: true);
+        ApplyState(force: true, emitSignal: true);
     }
 
     public override void _UnhandledInput(InputEvent @event)
@@ -69,7 +74,7 @@ public partial class CurveCanvasStateManager : Node
         ApplyState();
     }
 
-    private void ApplyState(bool force = false)
+    private void ApplyState(bool force = false, bool emitSignal = true)
     {
         RefreshNodeReferences();
 
@@ -81,6 +86,11 @@ public partial class CurveCanvasStateManager : Node
             case EditorState.Action:
                 EnterActionState(force);
                 break;
+        }
+
+        if (emitSignal)
+        {
+            StateChanged?.Invoke(_currentState);
         }
     }
 
