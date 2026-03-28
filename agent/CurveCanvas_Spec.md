@@ -91,3 +91,10 @@ Gameplay-critical metadata for a usable level.
 * **Spawn Point:** Special ActionObject ID that defines the HostCharacter's starting `Transform3D` when entering Action Mode.
 * **Goal Line:** Special ActionObject ID marking completion; emits "Level Complete" when the HostCharacter crosses it.
 * **Kill Z-Plane:** Global float (e.g., `Y = -100`). If the HostCharacter drops below, the State Manager instantly resets them to the Spawn Point to avoid infinite falls.
+
+### Module J: Live Runtime Editing (Co-Op/Active Mode)
+**Concept:** The ability to manipulate splines and place Action Objects while the `HostCharacter` simulation is actively ticking.
+**Requirements:**
+* **Input Multiplexing:** The editor cursor and raycasting logic must be decoupled from the `ArchitectCamera` so they can function seamlessly through the `ActionCamera` during gameplay.
+* **Async Collision Generation:** When a curve point is modified during `EditorState.Action`, the `TrackMeshGenerator` must rebuild its `ConcavePolygonShape3D` physics collider on a background thread to prevent gameplay frame drops.
+* **Runtime Instantiation:** The `ActionObjectSnapper` must be capable of querying the `CurveCanvasRegistry` and spawning prefabs dynamically into the active SceneTree without requiring an editor-only `[Tool]` context.
