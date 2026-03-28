@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using Godot;
 
 namespace CurveCanvas.Editor;
@@ -10,16 +11,17 @@ public partial class CurveCanvasRegistry : Resource
     public partial class RegistryItem : Resource
     {
         [Export]
-        public PackedScene? Prefab { get; set; }
+        public PackedScene Prefab { get; set; } = default!;
 
         [Export]
-        public Texture2D? Thumbnail { get; set; }
+        public Texture2D Thumbnail { get; set; } = default!;
     }
 
     [Export]
     public Godot.Collections.Dictionary<string, RegistryItem> AssetPalette { get; set; } = new();
 
-    public PackedScene? GetPrefab(string objectId)
+    [return: MaybeNull]
+    public PackedScene GetPrefab(string objectId)
     {
         if (string.IsNullOrWhiteSpace(objectId))
         {
@@ -36,7 +38,8 @@ public partial class CurveCanvasRegistry : Resource
         return entry.Prefab;
     }
 
-    public Texture2D? GetThumbnail(string objectId)
+    [return: MaybeNull]
+    public Texture2D GetThumbnail(string objectId)
     {
         if (string.IsNullOrWhiteSpace(objectId))
         {
