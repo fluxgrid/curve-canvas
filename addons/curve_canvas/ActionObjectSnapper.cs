@@ -11,6 +11,9 @@ public partial class ActionObjectSnapper : Node3D
     private Path3D? _trackPath;
     private float _curveOffset;
     private bool _transformDirty = true;
+    private CurveCanvasRegistry? _registry;
+    private string _objectId = string.Empty;
+    private Node3D? _spawnedInstance;
 
     [Export]
     public Path3D? TrackPath
@@ -25,6 +28,39 @@ public partial class ActionObjectSnapper : Node3D
 
             _trackPath = value;
             MarkTransformDirty();
+        }
+    }
+
+    [Export]
+    public CurveCanvasRegistry? Registry
+    {
+        get => _registry;
+        set
+        {
+            if (_registry == value)
+            {
+                return;
+            }
+
+            _registry = value;
+            RefreshAssetInstance();
+        }
+    }
+
+    [Export]
+    public string ObjectID
+    {
+        get => _objectId;
+        set
+        {
+            var sanitized = value?.Trim() ?? string.Empty;
+            if (_objectId == sanitized)
+            {
+                return;
+            }
+
+            _objectId = sanitized;
+            RefreshAssetInstance();
         }
     }
 
@@ -48,6 +84,7 @@ public partial class ActionObjectSnapper : Node3D
     public override void _Ready()
     {
         base._Ready();
+        RefreshAssetInstance();
         SetProcess(Engine.IsEditorHint());
         UpdateSnapTransform();
     }
@@ -95,5 +132,39 @@ public partial class ActionObjectSnapper : Node3D
 
         GlobalTransform = new Transform3D(sampled.Basis, snappedOrigin);
         _transformDirty = false;
+    }
+
+    private void RefreshAssetInstance()
+    {
+        _spawnedInstance?.QueueFree();
+        _spawnedInstance = null;
+
+        if (_registry == null || string.IsNullOrWhiteSpace(_objectId))
+        {
+            return;
+        }
+
+        var prefab = _registry.GetPrefab(_objectId);
+        if (prefab == null)
+        {
+            return;
+        }
+
+        if (prefab.Instantiate() is not Node3D nodeInstance)
+        {
+            GD.PushError($"ActionObjectSnapper requires prefab '{_objectId}' to inherit Node3D.");
+            return;
+        }
+
+        nodeInstance.Name = $"{_objectId}_Prefab";
+        AddChild(nodeInstance);
+        if (Engine.IsEditorHint())
+        {
+            var owner = Owner ?? GetTree()?.EditedSceneRoot;
+            nodeInstance.Owner = owner;
+        }
+
+        _spawnedInstance = nodeInstance;
+        MarkTransformDirty();
     }
 }
