@@ -66,3 +66,28 @@ Strictly defines how 2D textures and 3D transforms map to the procedural curve.
   * The editor uses `Curve3D.GetClosestPoint()` or interpolates X-coordinates against the baked curve array to find the track's absolute `Y` elevation at any given lateral position.
   * **Scenery Planes:** Objects on Z-offset planes set their position to `Vector3(Cursor.X, TrackElevation.Y, DepthPlane.Z)`. Billboard modes on `Sprite3D` nodes are preserved.
   * **Action Plane:** Trick objects (Z=0) read the curve tangent at their position and apply a Basis rotation aligned with the downward slope.
+
+### Module F: Asset Registry (The Palette)
+Centralized palette describing every placeable asset.
+* **CurveCanvasRegistry Resource:** Holds authoritative mappings for editor tooling.
+* **Prefab Dictionary:** Maps `ObjectID (string)` → `PackedScene` for instantiating gameplay/prop prefabs (ramps, trees, etc.).
+* **Thumbnail Dictionary:** Maps `ObjectID (string)` → `Texture2D` thumbnails used to render buttons/previews in the UI.
+* **Authoring Integration:** `ActionObjectSnapper` (and any placement tool) must query this registry to spawn the correct object whenever a designer selects an ID.
+
+### Module G: Advanced Spline Manipulation (CRUD UX)
+Viewport UX so designers can iterate on curves non-destructively.
+* **Select:** Perform screen-space raycasts from the Architect Camera. Detect curve control points under the cursor, highlight the current selection.
+* **Move:** Provide gizmo handles (constrained to Z=0) so dragging updates the point position while maintaining planar rules.
+* **Insert:** Allow clicking on the track mesh between two points to subdivide the curve and add a new control point in-place.
+* **Delete:** `Backspace/Delete` removes the selected point, then immediately re-bakes the curve and rebuilds the mesh.
+
+### Module H: Undo/Redo Integration
+Protect designer flow with native undo support.
+* Route every state change (add/move/delete points, placing/removing Action Objects, etc.) through `EditorUndoRedoManager`.
+* Ensure each action calls `CreateAction()`, `AddDoMethod()`, `AddUndoMethod()`, and `CommitAction()` so Ctrl+Z/Cmd+Z works for all authoring operations.
+
+### Module I: Level Meta-Data & Boundaries
+Gameplay-critical metadata for a usable level.
+* **Spawn Point:** Special ActionObject ID that defines the HostCharacter's starting `Transform3D` when entering Action Mode.
+* **Goal Line:** Special ActionObject ID marking completion; emits "Level Complete" when the HostCharacter crosses it.
+* **Kill Z-Plane:** Global float (e.g., `Y = -100`). If the HostCharacter drops below, the State Manager instantly resets them to the Spawn Point to avoid infinite falls.
