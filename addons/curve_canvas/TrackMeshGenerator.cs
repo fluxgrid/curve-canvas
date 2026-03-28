@@ -7,7 +7,7 @@ public partial class TrackMeshGenerator : Path3D
     [Export] public float TrackWidth { get; set; } = 6.0f;
     [Export] public float TextureScale { get; set; } = 1.0f;
 
-    private MeshInstance3D _meshInstance;
+    private MeshInstance3D? _meshInstance;
 
     public override void _Ready()
     {
@@ -51,9 +51,15 @@ public partial class TrackMeshGenerator : Path3D
 
     private void GenerateTrackMesh()
     {
+        EnsureMeshInstance();
+        if (_meshInstance == null)
+        {
+            return;
+        }
+
         if (Curve == null || Curve.GetBakedPoints().Length < 2)
         {
-            if (_meshInstance != null) _meshInstance.Mesh = null;
+            _meshInstance.Mesh = null;
             return;
         }
 
