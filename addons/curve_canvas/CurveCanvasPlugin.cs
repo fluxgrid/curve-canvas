@@ -5,7 +5,7 @@ namespace CurveCanvas.Editor;
 [Tool]
 public partial class CurveCanvasPlugin : EditorPlugin
 {
-    private const float SelectionRadius = 1.0f;
+    private const float SelectionRadius = 2.0f;
     private TrackMeshGenerator? _currentTrack;
     private int _selectedPointIndex = -1;
 
