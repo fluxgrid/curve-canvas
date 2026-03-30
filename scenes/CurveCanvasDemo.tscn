@@ -1,33 +1,53 @@
-[gd_scene load_steps=5 format=3 uid="uid://d06d84d665914848a064c3ea"]
+[gd_scene format=3 uid="uid://daoh7kcq88mui"]
 
-[ext_resource type="Script" path="res://addons/curve_canvas/TrackMeshGenerator.cs" id="1"]
-[ext_resource type="Script" path="res://addons/curve_canvas/CurveCanvasStateManager.cs" id="2"]
-[ext_resource type="Script" path="res://addons/curve_canvas/TrajectoryGhostRenderer.cs" id="3"]
+[ext_resource type="Script" uid="uid://dl22bot6fb7ky" path="res://addons/curve_canvas/TrackMeshGenerator.cs" id="1_xryju"]
+
+[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_81nbn"]
+sky_horizon_color = Color(0.66224277, 0.6717428, 0.6867428, 1)
+ground_horizon_color = Color(0.66224277, 0.6717428, 0.6867428, 1)
+
+[sub_resource type="Sky" id="Sky_xryju"]
+sky_material = SubResource("ProceduralSkyMaterial_81nbn")
+
+[sub_resource type="Environment" id="Environment_g248d"]
+background_mode = 2
+sky = SubResource("Sky_xryju")
+tonemap_mode = 2
+glow_enabled = true
 
 [sub_resource type="Curve3D" id="Curve3D_1"]
-points = PackedVector3Array(-20, 0, 0, 0, 5, 0, 30, -2, 0)
+_data = {
+"points": PackedVector3Array(0, 0, 0, 0, 0, 0, 0.07908529, -0.034810662, 0, 0, 0, 0, 0, 0, 0, 0.79812425, -0.22341108, 0, 0, 0, 0, 0, 0, 0, 1.422864, 0.31881547, 0, 0, 0, 0, 0, 0, 0, 2.5426807, -0.37664914, 0, 0, 0, 0, 0, 0, 0, 3.8039474, 0.3541782, 0, 0, 0, 0, 0, 0, 0, 4.275449, -0.25877377, 0, 0, 0, 0, 0, 0, 0, 6.2321815, 0.30702817, 0, 0, 0, 0, 0, 0, 0, 7.080883, -0.24698645, 0, 0, 0, 0, 0, 0, 0, 57.502956, 47.706406, -4.2338867, 0, 0, 0, 0, 0, 0, 111.34806, 38.328323, -4.5178833, 0, 0, 0, 0, 0, 0, 266.86453, 40.885986, -7.411316, 0, 0, 0, 0, 0, 0, 314.6667, 81.808426, -11.107666),
+"tilts": PackedFloat32Array(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+}
+point_count = 12
 
-[node name="CurveCanvasDemo" type="Node3D"]
+[node name="CurveCanvasDemo" type="Node3D" unique_id=343262453]
 
-[node name="TrackGenerator" type="Path3D" parent="." script="ExtResource(1)"]
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=1095815465]
+transform = Transform3D(-0.8660254, -0.43301278, 0.25, 0, 0.49999997, 0.86602545, -0.50000006, 0.75, -0.43301266, 0, 0, 0)
+shadow_enabled = true
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=2081033886]
+environment = SubResource("Environment_g248d")
+
+[node name="TrackGenerator" type="Path3D" parent="." unique_id=1881980155]
 curve = SubResource("Curve3D_1")
+script = ExtResource("1_xryju")
 
-[node name="ArchitectCamera" type="Camera3D" parent="."]
-position = Vector3(0, 50, 50)
-rotation_degrees = Vector3(-45, 0, 0)
+[node name="CSGSphere3D" type="CSGSphere3D" parent="TrackGenerator" unique_id=1250161297]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.513153, 2.1610832, 0)
+radius = 1.0
 
-[node name="TestKCC" type="CharacterBody3D" parent="."]
+[node name="ArchitectCamera" type="Camera3D" parent="." unique_id=195963348]
+transform = Transform3D(1, 0, 0, 0, 0.9828454, -0.18443163, 0, 0.18443163, 0.9828454, 65.30859, 15.641022, 55.11493)
+current = true
 
-[node name="ActionCamera" type="Camera3D" parent="TestKCC"]
-position = Vector3(0, 2, 5)
-rotation_degrees = Vector3(-15, 0, 0)
+[node name="TestKCC" type="CharacterBody3D" parent="." unique_id=1769408962]
 
-[node name="StateManager" type="Node" parent="." script="ExtResource(2)"]
-ArchitectCameraPath = NodePath("../ArchitectCamera")
-ActionCameraPath = NodePath("../TestKCC/ActionCamera")
-TrackPathNodePath = NodePath("../TrackGenerator")
-HostCharacterPath = NodePath("../TestKCC")
+[node name="ActionCamera" type="Camera3D" parent="TestKCC" unique_id=60951192]
+transform = Transform3D(1, 0, 0, 0, 0.99824506, -0.059219226, 0, 0.059219256, 0.998245, 0, 2, 184)
 
-[node name="TrajectoryGhost" type="Node3D" parent="." script="ExtResource(3)"]
-HostCharacterPath = NodePath("../TestKCC")
-StateManagerPath = NodePath("../StateManager")
+[node name="StateManager" type="Node" parent="." unique_id=1603881288]
+
+[node name="TrajectoryGhost" type="Node3D" parent="." unique_id=1713237919]
