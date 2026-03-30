@@ -1,0 +1,5 @@
+[
+    {"id": 11, "name": "Implement RuntimeCamera3D with Z=0 plane raycasting for viewport input"},
+    {"id": 12, "name": "Build input multiplexer using _UnhandledInput to route clicks between UI and sandbox states"},
+    {"id": 13, "name": "Refactor TrackMeshGenerator for asynchronous mesh and collider rebuilding"}
+]
