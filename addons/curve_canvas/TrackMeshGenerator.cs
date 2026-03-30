@@ -366,13 +366,15 @@ public partial class TrackMeshGenerator : Path3D
         {
             var start = flattened[i];
             var end = flattened[i + 1];
+            var startPoint = new Vector3(start.X, start.Y, 0f);
+            var endPoint = new Vector3(end.X, end.Y, 0f);
             var startV = vCoordinates[i];
             var endV = vCoordinates[i + 1];
 
-            var startLeft = new Vector3(start.X, start.Y, -halfWidth);
-            var startRight = new Vector3(start.X, start.Y, halfWidth);
-            var endLeft = new Vector3(end.X, end.Y, -halfWidth);
-            var endRight = new Vector3(end.X, end.Y, halfWidth);
+            var startLeft = new Vector3(startPoint.X, startPoint.Y, -halfWidth);
+            var startRight = new Vector3(startPoint.X, startPoint.Y, halfWidth);
+            var endLeft = new Vector3(endPoint.X, endPoint.Y, -halfWidth);
+            var endRight = new Vector3(endPoint.X, endPoint.Y, halfWidth);
 
             var category = ClassifySurface(slopes[i], settings.HighGripThreshold, settings.IceThreshold);
             var accumulator = category == SurfaceCategory.Ice ? iceAccumulator : highGripAccumulator;
@@ -414,8 +416,8 @@ public partial class TrackMeshGenerator : Path3D
     private static float CalculateSlopeMagnitude(Vector3 start, Vector3 end)
     {
         var delta = end - start;
-        var planarLength = Mathf.Sqrt(delta.X * delta.X + delta.Z * delta.Z);
-        if (planarLength <= Mathf.Epsilon)
+        var planarLength = Mathf.Abs(delta.X);
+        if (Mathf.IsZeroApprox(planarLength))
         {
             return 0f;
         }
@@ -470,11 +472,11 @@ public partial class TrackMeshGenerator : Path3D
             _normals.Add(normal);
 
             _indices.Add(baseIndex);
-            _indices.Add(baseIndex + 1);
             _indices.Add(baseIndex + 2);
             _indices.Add(baseIndex + 1);
+            _indices.Add(baseIndex + 1);
+            _indices.Add(baseIndex + 2);
             _indices.Add(baseIndex + 3);
-            _indices.Add(baseIndex + 2);
         }
 
         public SurfaceMeshData ToSurfaceData()
@@ -490,15 +492,7 @@ public partial class TrackMeshGenerator : Path3D
 
     private static Vector3 CalculateQuadNormal(Vector3 startLeft, Vector3 startRight, Vector3 endLeft)
     {
-        var edge1 = startRight - startLeft;
-        var edge2 = endLeft - startLeft;
-        var normal = edge1.Cross(edge2);
-        if (normal.LengthSquared() <= Mathf.Epsilon)
-        {
-            return Vector3.Up;
-        }
-
-        return normal.Normalized();
+        return new Vector3(0f, 0f, 1f);
     }
 
     private readonly record struct MeshBuildSettings(
