@@ -31,16 +31,22 @@ public partial class CurveCanvasStateManager : Node
     [Export]
     public NodePath HostCharacterPath { get; set; } = new();
 
+    [Export(PropertyHint.Range, "-500,500,0.1")]
+    public float KillZ { get; set; } = -75f;
+
     private Camera3D? _architectCamera;
     private Camera3D? _actionCamera;
     private Path3D? _trackPath;
     private Node3D? _hostCharacter;
     private EditorState _currentState = EditorState.Architect;
+    private ActionObjectSnapper? _spawnPoint;
+    private ActionObjectSnapper? _goalLine;
 
     public override void _Ready()
     {
         RefreshNodeReferences();
         ApplyState(force: true, emitSignal: true);
+        SetPhysicsProcess(true);
     }
 
     public override void _UnhandledInput(InputEvent @event)
@@ -120,6 +126,13 @@ public partial class CurveCanvasStateManager : Node
             return;
         }
 
+        if (TryApplySpawnPoint())
+        {
+            _hostCharacter.Visible = true;
+            _hostCharacter.ProcessMode = Node.ProcessModeEnum.Inherit;
+            return;
+        }
+
         var viewport = GetViewport();
         if (viewport == null)
         {
@@ -135,6 +148,21 @@ public partial class CurveCanvasStateManager : Node
         _hostCharacter.GlobalPosition = closestPoint;
         _hostCharacter.Visible = true;
         _hostCharacter.ProcessMode = Node.ProcessModeEnum.Inherit;
+    }
+
+    public override void _PhysicsProcess(double delta)
+    {
+        base._PhysicsProcess(delta);
+
+        if (_currentState != EditorState.Action || _hostCharacter == null)
+        {
+            return;
+        }
+
+        if (_hostCharacter.GlobalPosition.Y <= KillZ)
+        {
+            ResetHostCharacterToSpawn();
+        }
     }
 
     private static Vector3 ProjectRayToZPlane(Vector3 origin, Vector3 direction)
@@ -155,6 +183,7 @@ public partial class CurveCanvasStateManager : Node
         _actionCamera = ResolveNode(ActionCameraPath, _actionCamera);
         _trackPath = ResolveNode(TrackPathNodePath, _trackPath);
         _hostCharacter = ResolveNode(HostCharacterPath, _hostCharacter);
+        RefreshSpecialActionObjects();
     }
 
     private T? ResolveNode<T>(NodePath path, T? current) where T : Node
@@ -170,5 +199,73 @@ public partial class CurveCanvasStateManager : Node
         }
 
         return GetNodeOrNull<T>(path);
+    }
+
+    private void RefreshSpecialActionObjects()
+    {
+        _spawnPoint = null;
+        _goalLine = null;
+
+        var tree = GetTree();
+        if (tree == null)
+        {
+            return;
+        }
+
+        var groupMembers = tree.GetNodesInGroup(ActionObjectSnapper.ActionObjectGroup);
+        foreach (var member in groupMembers)
+        {
+            if (member is not ActionObjectSnapper snapper)
+            {
+                continue;
+            }
+
+            switch (snapper.SpecialRole)
+            {
+                case ActionObjectSnapper.SpecialObjectRole.SpawnPoint when _spawnPoint == null:
+                    _spawnPoint = snapper;
+                    break;
+                case ActionObjectSnapper.SpecialObjectRole.GoalLine when _goalLine == null:
+                    _goalLine = snapper;
+                    break;
+            }
+        }
+    }
+
+    private bool TryApplySpawnPoint()
+    {
+        RefreshSpecialActionObjects();
+        if (_spawnPoint == null || _hostCharacter == null)
+        {
+            return false;
+        }
+
+        _hostCharacter.GlobalTransform = _spawnPoint.GlobalTransform;
+        if (_hostCharacter is CharacterBody3D characterBody)
+        {
+            characterBody.Velocity = Vector3.Zero;
+        }
+
+        return true;
+    }
+
+    private void ResetHostCharacterToSpawn()
+    {
+        if (TryApplySpawnPoint())
+        {
+            return;
+        }
+
+        if (_hostCharacter == null || _trackPath?.Curve == null)
+        {
+            return;
+        }
+
+        var fallback = _trackPath.Curve.GetClosestPoint(_hostCharacter.GlobalPosition);
+        _hostCharacter.GlobalPosition = fallback;
+        if (_hostCharacter is CharacterBody3D body)
+        {
+            body.Velocity = Vector3.Zero;
+        }
     }
 }

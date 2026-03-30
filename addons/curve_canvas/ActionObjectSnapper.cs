@@ -1,3 +1,4 @@
+using System;
 using Godot;
 
 namespace CurveCanvas.Editor;
@@ -8,12 +9,22 @@ namespace CurveCanvas.Editor;
 [Tool]
 public partial class ActionObjectSnapper : Node3D
 {
+    public const string ActionObjectGroup = "curve_canvas_action_objects";
+
+    public enum SpecialObjectRole
+    {
+        None,
+        SpawnPoint,
+        GoalLine
+    }
+
     private Path3D? _trackPath;
     private float _curveOffset;
     private bool _transformDirty = true;
     private CurveCanvasRegistry? _registry;
     private string _objectId = string.Empty;
     private Node3D? _spawnedInstance;
+    private SpecialObjectRole _specialRole = SpecialObjectRole.None;
 
     [Export]
     public Path3D? TrackPath
@@ -61,8 +72,19 @@ public partial class ActionObjectSnapper : Node3D
 
             _objectId = sanitized;
             RefreshAssetInstance();
+            UpdateSpecialRoleFromId();
         }
     }
+
+    [Export(PropertyHint.Enum, "None,SpawnPoint,GoalLine")]
+    public SpecialObjectRole SpecialRole
+    {
+        get => _specialRole;
+        set => _specialRole = value;
+    }
+
+    [Export]
+    public bool AutoDetectSpecialRole { get; set; } = true;
 
     [Export(PropertyHint.Range, "0,10000,0.1")]
     public float CurveOffset
@@ -84,6 +106,7 @@ public partial class ActionObjectSnapper : Node3D
     public override void _Ready()
     {
         base._Ready();
+        AddToGroup(ActionObjectGroup, persistent: true);
         RefreshAssetInstance();
         SetProcess(Engine.IsEditorHint());
         UpdateSnapTransform();
@@ -166,5 +189,26 @@ public partial class ActionObjectSnapper : Node3D
 
         _spawnedInstance = nodeInstance;
         MarkTransformDirty();
+    }
+
+    private void UpdateSpecialRoleFromId()
+    {
+        if (!AutoDetectSpecialRole)
+        {
+            return;
+        }
+
+        if (string.Equals(_objectId, "SpawnPoint", StringComparison.OrdinalIgnoreCase))
+        {
+            _specialRole = SpecialObjectRole.SpawnPoint;
+        }
+        else if (string.Equals(_objectId, "GoalLine", StringComparison.OrdinalIgnoreCase))
+        {
+            _specialRole = SpecialObjectRole.GoalLine;
+        }
+        else
+        {
+            _specialRole = SpecialObjectRole.None;
+        }
     }
 }
