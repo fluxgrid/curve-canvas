@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Godot;
 
 namespace CurveCanvas.Editor;
@@ -41,6 +42,11 @@ public partial class CurveCanvasStateManager : Node
     private EditorState _currentState = EditorState.Architect;
     private ActionObjectSnapper? _spawnPoint;
     private ActionObjectSnapper? _goalLine;
+    private readonly List<CameraTriggerAuthor> _cameraTriggers = new();
+    private readonly Dictionary<CameraTriggerAuthor, Area3D.BodyEnteredEventHandler> _triggerEnterHandlers = new();
+    private readonly Dictionary<CameraTriggerAuthor, Area3D.BodyExitedEventHandler> _triggerExitHandlers = new();
+    private CameraTriggerAuthor? _activeCameraTrigger;
+    private Camera3D? _overrideCamera;
 
     public override void _Ready()
     {
@@ -184,6 +190,7 @@ public partial class CurveCanvasStateManager : Node
         _trackPath = ResolveNode(TrackPathNodePath, _trackPath);
         _hostCharacter = ResolveNode(HostCharacterPath, _hostCharacter);
         RefreshSpecialActionObjects();
+        RefreshCameraTriggers();
     }
 
     private T? ResolveNode<T>(NodePath path, T? current) where T : Node
@@ -230,6 +237,87 @@ public partial class CurveCanvasStateManager : Node
                     break;
             }
         }
+    }
+
+    private void RefreshCameraTriggers()
+    {
+        foreach (var trigger in _cameraTriggers)
+        {
+            if (_triggerEnterHandlers.TryGetValue(trigger, out var enterHandler))
+            {
+                trigger.BodyEntered -= enterHandler;
+            }
+
+            if (_triggerExitHandlers.TryGetValue(trigger, out var exitHandler))
+            {
+                trigger.BodyExited -= exitHandler;
+            }
+        }
+
+        _cameraTriggers.Clear();
+        _triggerEnterHandlers.Clear();
+        _triggerExitHandlers.Clear();
+
+        var tree = GetTree();
+        if (tree == null)
+        {
+            return;
+        }
+
+        var members = tree.GetNodesInGroup(CameraTriggerAuthor.TriggerGroup);
+        foreach (var member in members)
+        {
+            if (member is not CameraTriggerAuthor trigger)
+            {
+                continue;
+            }
+
+            Area3D.BodyEnteredEventHandler enterHandler = body => OnCameraTriggerBodyEntered(trigger, body);
+            Area3D.BodyExitedEventHandler exitHandler = body => OnCameraTriggerBodyExited(trigger, body);
+
+            trigger.BodyEntered += enterHandler;
+            trigger.BodyExited += exitHandler;
+
+            _cameraTriggers.Add(trigger);
+            _triggerEnterHandlers[trigger] = enterHandler;
+            _triggerExitHandlers[trigger] = exitHandler;
+        }
+    }
+
+    private void OnCameraTriggerBodyEntered(CameraTriggerAuthor trigger, Node3D body)
+    {
+        if (_hostCharacter == null || body != _hostCharacter)
+        {
+            return;
+        }
+
+        var targetCamera = trigger.GetNodeOrNull<Camera3D>(trigger.TargetCameraPath);
+        if (targetCamera == null)
+        {
+            GD.PushWarning($"[CurveCanvasStateManager] Camera trigger '{trigger.Name}' has no valid TargetCameraPath.");
+            return;
+        }
+
+        _activeCameraTrigger = trigger;
+        _overrideCamera = targetCamera;
+        targetCamera.MakeCurrent();
+    }
+
+    private void OnCameraTriggerBodyExited(CameraTriggerAuthor trigger, Node3D body)
+    {
+        if (_hostCharacter == null || body != _hostCharacter)
+        {
+            return;
+        }
+
+        if (_activeCameraTrigger != trigger)
+        {
+            return;
+        }
+
+        _activeCameraTrigger = null;
+        _overrideCamera = null;
+        _actionCamera?.MakeCurrent();
     }
 
     private bool TryApplySpawnPoint()

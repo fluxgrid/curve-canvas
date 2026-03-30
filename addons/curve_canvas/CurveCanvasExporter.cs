@@ -69,6 +69,8 @@ public partial class CurveCanvasExporter : EditorScript
             Spline = CollectSplinePoints(track),
             ActionObjects = CollectActionObjects(sceneRoot),
             SceneryObjects = CollectSceneryObjects(sceneRoot)
+            ,
+            CameraTriggers = CollectCameraTriggers(sceneRoot)
         };
 
         return payload;
@@ -144,6 +146,40 @@ public partial class CurveCanvasExporter : EditorScript
         return results;
     }
 
+    private static List<CameraTriggerData> CollectCameraTriggers(Node sceneRoot)
+    {
+        var results = new List<CameraTriggerData>();
+        var tree = sceneRoot.GetTree();
+        if (tree == null)
+        {
+            return results;
+        }
+
+        var members = tree.GetNodesInGroup(CameraTriggerAuthor.TriggerGroup);
+        foreach (var member in members)
+        {
+            if (member is not CameraTriggerAuthor trigger)
+            {
+                continue;
+            }
+
+            if (string.IsNullOrWhiteSpace(trigger.ObjectID))
+            {
+                continue;
+            }
+
+            var data = new CameraTriggerData
+            {
+                ObjectId = trigger.ObjectID,
+                TargetCameraPath = trigger.TargetCameraPath.ToString(),
+                VolumeTransform = CurveCanvasExportCommon.ToExportTransform(trigger.GlobalTransform)
+            };
+            results.Add(data);
+        }
+
+        return results;
+    }
+
     private static bool EnsureExportDirectory()
     {
         var absolute = ProjectSettings.GlobalizePath(ExportFolder);
@@ -201,6 +237,7 @@ public partial class CurveCanvasImporter : EditorScript
             }
 
             ApplySplineData(sceneRoot, data);
+            ReportCameraTriggers(data);
             GD.Print($"[CurveCanvasImporter] Imported {data.Spline.Count} spline points from {importPath}");
         }
         catch (Exception ex)
@@ -237,6 +274,16 @@ public partial class CurveCanvasImporter : EditorScript
             curve.RemovePoint(i);
         }
     }
+
+    private static void ReportCameraTriggers(CurveCanvasExportData data)
+    {
+        if (data.CameraTriggers.Count == 0)
+        {
+            return;
+        }
+
+        GD.Print($"[CurveCanvasImporter] Camera trigger data detected ({data.CameraTriggers.Count}). Runtime reconstruction coming in a future update.");
+    }
 }
 
 internal static class CurveCanvasExportCommon
@@ -268,5 +315,23 @@ internal static class CurveCanvasExportCommon
         }
 
         return root.Name;
+    }
+
+    public static CurveCanvasTransform ToExportTransform(Transform3D transform)
+    {
+        var position = transform.Origin;
+        var basis = transform.Basis;
+        var scale = basis.Scale;
+        var rotation = basis.GetEuler();
+
+        return new CurveCanvasTransform
+        {
+            Position = new CurveCanvasVector3(position.X, position.Y, position.Z),
+            RotationDegrees = new CurveCanvasVector3(
+                Mathf.RadToDeg(rotation.X),
+                Mathf.RadToDeg(rotation.Y),
+                Mathf.RadToDeg(rotation.Z)),
+            Scale = new CurveCanvasVector3(scale.X, scale.Y, scale.Z)
+        };
     }
 }
