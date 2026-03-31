@@ -5,6 +5,8 @@ namespace CurveCanvas.Editor;
 [Tool]
 public partial class CurveCanvasPlugin : EditorPlugin
 {
+    private const string TestExportPath = "res://Exports/test_level.curvecanvas.json";
+    private const string TriggerPrefabPath = "res://addons/curve_canvas/Prefabs/CameraTrigger.tscn";
     private const float SelectionRadius = 2.0f;
     private TrackMeshGenerator? _currentTrack;
     private int _selectedPointIndex = -1;
@@ -14,10 +16,14 @@ public partial class CurveCanvasPlugin : EditorPlugin
 
     private bool _propBrushMode;
     private readonly PropBrushTool _propBrushTool = new();
+    private HBoxContainer? _toolbar;
+    private Button? _exportButton;
+    private Button? _importButton;
 
     public override void _EnterTree()
     {
         GD.Print("CurveCanvas Initialized");
+        CreateToolbar();
     }
 
     public override void _ExitTree()
@@ -26,6 +32,7 @@ public partial class CurveCanvasPlugin : EditorPlugin
         _selectedPointIndex = -1;
         _propBrushTool.CancelStroke();
         _propBrushMode = false;
+        DestroyToolbar();
     }
 
     public override bool _Handles(GodotObject @object)
@@ -249,5 +256,94 @@ public partial class CurveCanvasPlugin : EditorPlugin
         }
 
         return closestIndex;
+    }
+
+    private void CreateToolbar()
+    {
+        if (_toolbar != null)
+        {
+            return;
+        }
+
+        _toolbar = new HBoxContainer
+        {
+            Name = "CurveCanvasToolbar",
+            SizeFlagsHorizontal = Control.SizeFlags.ShrinkCenter
+        };
+
+        _exportButton = new Button
+        {
+            Text = "Export Canvas",
+            FocusMode = Control.FocusModeEnum.None
+        };
+        _exportButton.Pressed += OnExportCanvasPressed;
+        _toolbar.AddChild(_exportButton);
+
+        _importButton = new Button
+        {
+            Text = "Import Canvas",
+            FocusMode = Control.FocusModeEnum.None
+        };
+        _importButton.Pressed += OnImportCanvasPressed;
+        _toolbar.AddChild(_importButton);
+
+        AddControlToContainer(CustomControlContainer.SpatialEditorMenu, _toolbar);
+    }
+
+    private void DestroyToolbar()
+    {
+        if (_toolbar == null)
+        {
+            return;
+        }
+
+        RemoveControlFromContainer(CustomControlContainer.SpatialEditorMenu, _toolbar);
+        if (_exportButton != null)
+        {
+            _exportButton.Pressed -= OnExportCanvasPressed;
+            _exportButton.QueueFree();
+        }
+
+        if (_importButton != null)
+        {
+            _importButton.Pressed -= OnImportCanvasPressed;
+            _importButton.QueueFree();
+        }
+
+        _toolbar.QueueFree();
+        _toolbar = null;
+        _exportButton = null;
+        _importButton = null;
+    }
+
+    private void OnExportCanvasPressed()
+    {
+        var sceneRoot = EditorInterface.Singleton?.GetEditedSceneRoot();
+        if (sceneRoot == null)
+        {
+            GD.PushError("[CurveCanvasPlugin] No active scene to export.");
+            return;
+        }
+
+        CurveCanvasExporter.SaveCanvas(sceneRoot, TestExportPath);
+    }
+
+    private void OnImportCanvasPressed()
+    {
+        var sceneRoot = EditorInterface.Singleton?.GetEditedSceneRoot();
+        if (sceneRoot == null)
+        {
+            GD.PushError("[CurveCanvasPlugin] No active scene to import into.");
+            return;
+        }
+
+        var triggerPrefab = GD.Load<PackedScene>(TriggerPrefabPath);
+        if (triggerPrefab == null)
+        {
+            GD.PushError($"[CurveCanvasPlugin] Failed to load trigger prefab at {TriggerPrefabPath}");
+            return;
+        }
+
+        CurveCanvasImporter.LoadCanvas(TestExportPath, sceneRoot, triggerPrefab);
     }
 }

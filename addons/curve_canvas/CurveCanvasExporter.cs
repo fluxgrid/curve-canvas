@@ -18,45 +18,59 @@ public partial class CurveCanvasExporter : EditorScript
 
     public override void _Run()
     {
-        var editor = EditorInterface.Singleton;
-        var sceneRoot = editor?.GetEditedSceneRoot();
+        var sceneRoot = EditorInterface.Singleton?.GetEditedSceneRoot();
         if (sceneRoot == null)
         {
             GD.PushError("[CurveCanvasExporter] No open scene to export.");
             return;
         }
 
+        SaveCanvas(sceneRoot);
+    }
+
+    public static bool SaveCanvas(Node sceneRoot, string? exportPath = null)
+    {
+        if (sceneRoot == null)
+        {
+            GD.PushError("[CurveCanvasExporter] Scene root cannot be null.");
+            return false;
+        }
+
         var track = CurveCanvasExportCommon.FindTrackGenerator(sceneRoot);
         if (track?.Curve == null)
         {
             GD.PushError("[CurveCanvasExporter] TrackMeshGenerator with a valid Curve is required.");
-            return;
+            return false;
         }
 
-        var exportData = BuildExportPayload(track, sceneRoot);
-        if (!EnsureExportDirectory())
+        var targetPath = string.IsNullOrWhiteSpace(exportPath)
+            ? $"{ExportFolder}/{CurveCanvasExportCommon.GetSceneName(sceneRoot)}{FileExtension}"
+            : exportPath;
+
+        var directory = IOPath.GetDirectoryName(targetPath) ?? ExportFolder;
+        if (!EnsureExportDirectory(directory))
         {
-            return;
+            return false;
         }
-
-        var sceneName = CurveCanvasExportCommon.GetSceneName(sceneRoot);
-        var exportPath = $"{ExportFolder}/{sceneName}{FileExtension}";
 
         try
         {
+            var exportData = BuildExportPayload(track, sceneRoot);
             var options = new JsonSerializerOptions { WriteIndented = true };
             var json = JsonSerializer.Serialize(exportData, options);
-            using var file = Godot.FileAccess.Open(exportPath, Godot.FileAccess.ModeFlags.Write);
+            using var file = Godot.FileAccess.Open(targetPath, Godot.FileAccess.ModeFlags.Write);
             file.StoreString(json);
-            GD.Print($"[CurveCanvasExporter] Exported {exportData.Spline.Count} points, {exportData.ActionObjects.Count} action objects, and {exportData.SceneryObjects.Count} scenery items to {exportPath}");
+            GD.Print($"[CurveCanvasExporter] Exported {exportData.Spline.Count} points, {exportData.ActionObjects.Count} action objects, {exportData.SceneryObjects.Count} scenery items, and {exportData.CameraTriggers.Count} camera triggers to {targetPath}");
+            return true;
         }
         catch (Exception ex)
         {
             GD.PushError($"[CurveCanvasExporter] Failed to write export file: {ex.Message}");
+            return false;
         }
     }
 
-    private CurveCanvasExportData BuildExportPayload(TrackMeshGenerator track, Node sceneRoot)
+    private static CurveCanvasExportData BuildExportPayload(TrackMeshGenerator track, Node sceneRoot)
     {
         var payload = new CurveCanvasExportData
         {
@@ -180,9 +194,9 @@ public partial class CurveCanvasExporter : EditorScript
         return results;
     }
 
-    private static bool EnsureExportDirectory()
+    private static bool EnsureExportDirectory(string directory)
     {
-        var absolute = ProjectSettings.GlobalizePath(ExportFolder);
+        var absolute = ProjectSettings.GlobalizePath(directory);
         var result = DirAccess.MakeDirRecursiveAbsolute(absolute);
         if (result != Error.Ok && result != Error.AlreadyInUse)
         {
