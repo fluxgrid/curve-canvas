@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Godot;
 
 namespace CurveCanvas.Editor;
@@ -37,8 +38,15 @@ public partial class RuntimeInputMultiplexer : Node
     private GodotObject? _curveCanvas;
     private TrackMeshGenerator? _trackGenerator;
     private Node? _propContainer;
+    private EditorUndoRedoManager? _undoRedo;
     private bool _isPointerDown;
+    private bool _propStrokeActive;
     private Vector3? _lastPropSpawnPosition;
+    private readonly List<Node3D> _currentStrokeNodes = new();
+    private readonly HashSet<Node3D> _strokeNodeSet = new();
+    private bool _currentStrokeIsErase;
+    private Node? _strokeContainer;
+    private Node? _strokeOwner;
 
     public override void _Ready()
     {
@@ -67,6 +75,11 @@ public partial class RuntimeInputMultiplexer : Node
     public void SetSandboxState(SandboxState newState)
     {
         _currentState = newState;
+    }
+
+    public void ConfigureUndoRedo(EditorUndoRedoManager? undoRedo)
+    {
+        _undoRedo = undoRedo;
     }
 
     private void DispatchInteraction(Vector3 hitPosition, bool isDrag)
@@ -110,7 +123,7 @@ public partial class RuntimeInputMultiplexer : Node
 
     private void HandlePropBrush(Vector3 position, bool isDrag)
     {
-        if (Input.IsKeyPressed(Key.Shift))
+        if (_currentStrokeIsErase)
         {
             ErasePropsNear(position);
             return;
@@ -231,12 +244,24 @@ public partial class RuntimeInputMultiplexer : Node
         if (mouseButton.Pressed)
         {
             _isPointerDown = true;
+            if (_currentState == SandboxState.PropBrush)
+            {
+                BeginPropStroke();
+            }
             ProcessPointerEvent(mouseButton.Position, isDrag: false);
         }
         else
         {
             _isPointerDown = false;
             _lastPropSpawnPosition = null;
+            if (_currentState == SandboxState.PropBrush)
+            {
+                CommitStroke();
+            }
+            else
+            {
+                ClearStrokeState();
+            }
         }
     }
 
@@ -260,12 +285,24 @@ public partial class RuntimeInputMultiplexer : Node
         if (touchEvent.Pressed)
         {
             _isPointerDown = true;
+            if (_currentState == SandboxState.PropBrush)
+            {
+                BeginPropStroke();
+            }
             ProcessPointerEvent(touchEvent.Position, isDrag: false);
         }
         else
         {
             _isPointerDown = false;
             _lastPropSpawnPosition = null;
+            if (_currentState == SandboxState.PropBrush)
+            {
+                CommitStroke();
+            }
+            else
+            {
+                ClearStrokeState();
+            }
         }
     }
 
@@ -305,29 +342,23 @@ public partial class RuntimeInputMultiplexer : Node
 
     private bool TrySpawnProp(Vector3 position)
     {
-        var canvas = GetCurveCanvas();
-        if (canvas != null)
+        var node = CreatePropNode(position);
+        if (node == null)
         {
-            if (canvas.HasMethod("SpawnProp"))
-            {
-                canvas.Call("SpawnProp", position);
-                return true;
-            }
-
-            if (canvas.HasMethod("HandlePropBrush"))
-            {
-                canvas.Call("HandlePropBrush", position);
-                return true;
-            }
+            return false;
         }
 
-        GD.Print($"[RuntimeInputMultiplexer] PropBrush placeholder at {position}");
+        if (_strokeNodeSet.Add(node))
+        {
+            _currentStrokeNodes.Add(node);
+        }
+
         return true;
     }
 
     private void ErasePropsNear(Vector3 position)
     {
-        var container = GetPropContainer();
+        var container = _strokeContainer ?? GetPropContainer();
         if (container == null)
         {
             GD.PushWarning("[RuntimeInputMultiplexer] Prop container not assigned; cannot erase props.");
@@ -335,6 +366,7 @@ public partial class RuntimeInputMultiplexer : Node
         }
 
         const float eraserRadius = 2.0f;
+        var matches = new List<Node3D>();
         foreach (var child in container.GetChildren())
         {
             if (child is not Node3D node)
@@ -342,10 +374,238 @@ public partial class RuntimeInputMultiplexer : Node
                 continue;
             }
 
+            if (_strokeNodeSet.Contains(node))
+            {
+                continue;
+            }
+
             if (node.GlobalPosition.DistanceTo(position) < eraserRadius)
             {
-                node.QueueFree();
+                matches.Add(node);
             }
         }
+
+        foreach (var node in matches)
+        {
+            container.RemoveChild(node);
+            if (_strokeNodeSet.Add(node))
+            {
+                _currentStrokeNodes.Add(node);
+            }
+        }
+    }
+
+    private void BeginPropStroke()
+    {
+        _propStrokeActive = true;
+        _currentStrokeNodes.Clear();
+        _strokeNodeSet.Clear();
+        _currentStrokeIsErase = Input.IsKeyPressed(Key.Shift);
+        _strokeContainer = GetPropContainer() ?? GetTrackGenerator();
+        _strokeOwner = DetermineOwner(_strokeContainer);
+        if (!_currentStrokeIsErase)
+        {
+            _lastPropSpawnPosition = null;
+        }
+    }
+
+    private void CommitStroke()
+    {
+        if (!_propStrokeActive)
+        {
+            ClearStrokeState();
+            return;
+        }
+
+        _propStrokeActive = false;
+
+        if (_currentStrokeNodes.Count == 0)
+        {
+            ClearStrokeState();
+            return;
+        }
+
+        var container = _strokeContainer ?? GetPropContainer();
+        if (container == null)
+        {
+            GD.PushWarning("[RuntimeInputMultiplexer] Prop container not assigned; discarding stroke.");
+            ClearStrokeState();
+            return;
+        }
+
+        if (_undoRedo == null)
+        {
+            if (_currentStrokeIsErase)
+            {
+                foreach (var node in _currentStrokeNodes)
+                {
+                    node.QueueFree();
+                }
+            }
+            else
+            {
+                foreach (var node in _currentStrokeNodes)
+                {
+                    container.AddChild(node);
+                    if (_strokeOwner != null)
+                    {
+                        node.Owner = _strokeOwner;
+                    }
+                }
+            }
+
+            ClearStrokeState(false);
+            return;
+        }
+
+        if (_currentStrokeIsErase)
+        {
+            foreach (var node in _currentStrokeNodes)
+            {
+                if (node.GetParent() == null)
+                {
+                    container.AddChild(node);
+                }
+
+                if (_strokeOwner != null)
+                {
+                    node.Owner = _strokeOwner;
+                }
+            }
+        }
+
+        var actionName = _currentStrokeIsErase ? "Erase Props" : "Paint Props";
+        _undoRedo.CreateAction(actionName);
+
+        if (_currentStrokeIsErase)
+        {
+            foreach (var node in _currentStrokeNodes)
+            {
+                _undoRedo.AddDoMethod(container, Node.MethodName.RemoveChild, node);
+                _undoRedo.AddDoReference(node);
+                _undoRedo.AddUndoMethod(container, Node.MethodName.AddChild, node);
+                if (_strokeOwner != null)
+                {
+                    _undoRedo.AddUndoMethod(node, Node.MethodName.SetOwner, _strokeOwner);
+                }
+            }
+        }
+        else
+        {
+            foreach (var node in _currentStrokeNodes)
+            {
+                _undoRedo.AddDoMethod(container, Node.MethodName.AddChild, node);
+                if (_strokeOwner != null)
+                {
+                    _undoRedo.AddDoMethod(node, Node.MethodName.SetOwner, _strokeOwner);
+                }
+                _undoRedo.AddUndoMethod(container, Node.MethodName.RemoveChild, node);
+                _undoRedo.AddUndoReference(node);
+            }
+        }
+
+        _undoRedo.CommitAction();
+        ClearStrokeState(false);
+    }
+
+    private void ClearStrokeState(bool restoreNodes = true)
+    {
+        if (restoreNodes)
+        {
+            var container = _strokeContainer ?? GetPropContainer();
+            if (container != null)
+            {
+                foreach (var node in _currentStrokeNodes)
+                {
+                    if (_currentStrokeIsErase && node.GetParent() == null)
+                    {
+                        container.AddChild(node);
+                        if (_strokeOwner != null)
+                        {
+                            node.Owner = _strokeOwner;
+                        }
+                    }
+                    else if (!_currentStrokeIsErase)
+                    {
+                        node.QueueFree();
+                    }
+                }
+            }
+            else
+            {
+                foreach (var node in _currentStrokeNodes)
+                {
+                    node.QueueFree();
+                }
+            }
+        }
+
+        _propStrokeActive = false;
+        _currentStrokeNodes.Clear();
+        _strokeNodeSet.Clear();
+        _strokeContainer = null;
+        _strokeOwner = null;
+        _currentStrokeIsErase = false;
+    }
+
+    private static Node? DetermineOwner(Node? node)
+    {
+        if (node == null)
+        {
+            return null;
+        }
+
+        return node.Owner ?? node.GetTree()?.EditedSceneRoot;
+    }
+
+    private Node3D? CreatePropNode(Vector3 planarPosition)
+    {
+        var track = GetTrackGenerator();
+        if (track?.Curve == null)
+        {
+            GD.PushWarning("[RuntimeInputMultiplexer] Track generator or curve missing; cannot paint props.");
+            return null;
+        }
+
+        var registry = track.PropBrushRegistry;
+        if (registry == null)
+        {
+            GD.PushWarning("[RuntimeInputMultiplexer] PropBrushRegistry not assigned on TrackMeshGenerator.");
+            return null;
+        }
+
+        if (string.IsNullOrWhiteSpace(track.PropBrushObjectId))
+        {
+            GD.PushWarning("[RuntimeInputMultiplexer] PropBrushObjectId is empty.");
+            return null;
+        }
+
+        var snapper = new SceneryPlaneSnapper
+        {
+            Name = $"PropStroke_{Guid.NewGuid():N}",
+            Registry = registry,
+            ObjectID = track.PropBrushObjectId,
+            TrackPath = track,
+            DepthZ = track.PropBrushDepthZ,
+            PlaneIndex = track.PropBrushPlaneIndex
+        };
+
+        var projected = ProjectBrushPosition(planarPosition, track);
+        snapper.Position = projected;
+        return snapper;
+    }
+
+    private static Vector3 ProjectBrushPosition(Vector3 position, TrackMeshGenerator track)
+    {
+        var curve = track.Curve;
+        if (curve == null)
+        {
+            return position;
+        }
+
+        position.Z = 0f;
+        var offset = CurveCanvasMath.GetClosestOffset(curve, position, out _);
+        var snapped = curve.SampleBaked(offset);
+        return new Vector3(position.X, snapped.Y, track.PropBrushDepthZ);
     }
 }

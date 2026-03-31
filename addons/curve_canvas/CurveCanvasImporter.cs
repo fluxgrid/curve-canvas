@@ -56,7 +56,8 @@ public partial class CurveCanvasImporter : EditorScript
     /// <param name="filePath">The JSON export path (res:// preferred).</param>
     /// <param name="rootNode">Scene graph node that should own the imported triggers.</param>
     /// <param name="triggerPrefab">Prefab instantiated for each trigger entry.</param>
-    public static void LoadCanvas(string filePath, Node rootNode, PackedScene triggerPrefab)
+    /// <param name="undoRedo">Optional undo stack to wrap trigger placement.</param>
+    public static void LoadCanvas(string filePath, Node rootNode, PackedScene triggerPrefab, EditorUndoRedoManager? undoRedo = null)
     {
         if (string.IsNullOrWhiteSpace(filePath))
         {
@@ -121,11 +122,33 @@ public partial class CurveCanvasImporter : EditorScript
             }
 
             triggerNode.Name = DetermineTriggerName(triggerData, i);
-            container.AddChild(triggerNode, true);
-            triggerNode.Owner = owner;
 
             ApplyTransform(triggerNode, triggerData.VolumeTransform);
             ApplyTriggerMetadata(triggerNode, triggerData);
+
+            if (undoRedo == null)
+            {
+                container.AddChild(triggerNode, true);
+                if (owner != null)
+                {
+                    triggerNode.Owner = owner;
+                }
+
+                continue;
+            }
+
+            var transform = triggerNode.GlobalTransform;
+
+            undoRedo.CreateAction($"Place Camera Trigger ({triggerNode.Name})");
+            undoRedo.AddDoMethod(container, Node.MethodName.AddChild, triggerNode);
+            if (owner != null)
+            {
+                undoRedo.AddDoMethod(triggerNode, Node.MethodName.SetOwner, owner);
+            }
+            undoRedo.AddDoMethod(triggerNode, Node3D.MethodName.SetGlobalTransform, transform);
+            undoRedo.AddUndoMethod(container, Node.MethodName.RemoveChild, triggerNode);
+            undoRedo.AddUndoReference(triggerNode);
+            undoRedo.CommitAction();
         }
 
         GD.Print($"[CurveCanvasImporter] Rebuilt {triggers.Count} camera trigger(s) from {filePath}.");

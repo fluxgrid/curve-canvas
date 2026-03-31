@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Godot;
 
 namespace CurveCanvas.Editor;
@@ -26,6 +27,7 @@ public partial class CurveCanvasPlugin : EditorPlugin
         GD.Print("CurveCanvas Initialized");
         CreateToolbar();
         CreateDialogs();
+        ConfigureRuntimeMultiplexers();
     }
 
     public override void _ExitTree()
@@ -50,6 +52,7 @@ public partial class CurveCanvasPlugin : EditorPlugin
         _isDraggingPoint = false;
         _pointMovedDuringDrag = false;
         _propBrushTool.ConfigureFromTrack(_currentTrack);
+        ConfigureRuntimeMultiplexers();
     }
 
     public override int _Forward3DGuiInput(Camera3D camera, InputEvent @event)
@@ -261,6 +264,42 @@ public partial class CurveCanvasPlugin : EditorPlugin
         return closestIndex;
     }
 
+    private void ConfigureRuntimeMultiplexers()
+    {
+        var sceneRoot = EditorInterface.Singleton?.GetEditedSceneRoot();
+        if (sceneRoot == null)
+        {
+            return;
+        }
+
+        var tree = sceneRoot.GetTree();
+        if (tree == null)
+        {
+            return;
+        }
+
+        var undoRedo = GetUndoRedo();
+        var multiplexers = new List<RuntimeInputMultiplexer>();
+        CollectMultiplexers(sceneRoot, multiplexers);
+        foreach (var multiplexer in multiplexers)
+        {
+            multiplexer.ConfigureUndoRedo(undoRedo);
+        }
+    }
+
+    private static void CollectMultiplexers(Node node, List<RuntimeInputMultiplexer> results)
+    {
+        if (node is RuntimeInputMultiplexer multiplexer)
+        {
+            results.Add(multiplexer);
+        }
+
+        foreach (Node child in node.GetChildren())
+        {
+            CollectMultiplexers(child, results);
+        }
+    }
+
     private void CreateToolbar()
     {
         if (_toolbar != null)
@@ -432,6 +471,6 @@ public partial class CurveCanvasPlugin : EditorPlugin
             return;
         }
 
-        CurveCanvasImporter.LoadCanvas(path, sceneRoot, triggerPrefab);
+        CurveCanvasImporter.LoadCanvas(path, sceneRoot, triggerPrefab, GetUndoRedo());
     }
 }
