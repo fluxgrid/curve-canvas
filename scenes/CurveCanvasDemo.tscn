@@ -8,6 +8,7 @@
 [ext_resource type="Script" path="res://addons/curve_canvas/RuntimeSplineHandles.cs" id="6_n9p2u"]
 [ext_resource type="Script" path="res://addons/curve_canvas/RuntimeInputMultiplexer.cs" id="7_yqv1w"]
 [ext_resource type="Script" path="res://addons/curve_canvas/RuntimeCamera3D.cs" id="8_qa8tp"]
+[ext_resource type="Script" path="res://addons/curve_canvas/CurveCanvasGameManager.cs" id="9_g27ju"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_81nbn"]
 sky_horizon_color = Color(0.66224277, 0.6717428, 0.6867428, 1)
@@ -123,3 +124,9 @@ offset = Vector2(0, 40)
 transform = Transform2D(1, 0, 0, 1, 0, 40)
 
 [node name="InGameEditorUI" parent="." unique_id=1382914013 instance=ExtResource("5_cbfy8")]
+
+[node name="GameManager" type="Node" parent="."]
+script = ExtResource("9_g27ju")
+StateManagerPath = NodePath("../StateManager")
+SceneRootPath = NodePath("..")
+MetadataPanelPath = NodePath("../LevelMetadataPanel")

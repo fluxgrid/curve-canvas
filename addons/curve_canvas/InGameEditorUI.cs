@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using CurveCanvas.AuthoringCore;
 using Godot;
+using IOPath = System.IO.Path;
 
 namespace CurveCanvas.Editor;
 
@@ -20,8 +21,10 @@ public partial class InGameEditorUI : CanvasLayer
     private Button? _selectToolButton;
     private Button? _drawToolButton;
     private Button? _propToolButton;
+    private Button? _saveButton;
     private Button? _exportButton;
     private Button? _importButton;
+    private Label? _activeFileLabel;
     private FileDialog? _exportDialog;
     private FileDialog? _importDialog;
     private LevelMetadataPanel? _metadataPanel;
@@ -30,6 +33,7 @@ public partial class InGameEditorUI : CanvasLayer
     private readonly List<RuntimeInputMultiplexer> _multiplexers = new();
     private RuntimeInputMultiplexer.SandboxState _activeSandboxState = RuntimeInputMultiplexer.SandboxState.Select;
     private readonly HashSet<Button> _configuredToolButtons = new();
+    private string _activeFilePath = string.Empty;
 
     public override void _Ready()
     {
@@ -37,6 +41,7 @@ public partial class InGameEditorUI : CanvasLayer
         BuildToolbar();
         CreateDialogs();
         CallDeferred(nameof(InitializeAfterSceneReady));
+        UpdateActiveFileLabel();
     }
 
     public override void _UnhandledInput(InputEvent @event)
@@ -138,6 +143,17 @@ public partial class InGameEditorUI : CanvasLayer
         _exportDialog?.PopupCenteredRatio();
     }
 
+    private void OnSaveButtonPressed()
+    {
+        if (string.IsNullOrWhiteSpace(_activeFilePath))
+        {
+            _exportDialog?.PopupCenteredRatio();
+            return;
+        }
+
+        TrySaveCanvas(_activeFilePath);
+    }
+
     private void OnImportButtonPressed()
     {
         _importDialog?.PopupCenteredRatio();
@@ -157,8 +173,7 @@ public partial class InGameEditorUI : CanvasLayer
             return;
         }
 
-        var overrides = BuildMetadataOverrides(_metadataPanel);
-        CurveCanvasExporter.SaveCanvas(sceneRoot, path, overrides);
+        TrySaveCanvas(path);
     }
 
     private void OnImportFileSelected(string path)
@@ -183,6 +198,7 @@ public partial class InGameEditorUI : CanvasLayer
         }
 
         CurveCanvasImporter.LoadCanvas(path, sceneRoot, _triggerPrefab, RuntimeUndoRedo, _metadataPanel);
+        SetActiveFilePath(path);
     }
 
     private Node? GetSceneRoot()
@@ -269,6 +285,49 @@ public partial class InGameEditorUI : CanvasLayer
         };
     }
 
+    private bool TrySaveCanvas(string filePath, bool updateActivePath = true)
+    {
+        var sceneRoot = GetSceneRoot();
+        if (sceneRoot == null)
+        {
+            GD.PushError("[InGameEditorUI] No active scene to export.");
+            return false;
+        }
+
+        var overrides = BuildMetadataOverrides(_metadataPanel);
+        if (!CurveCanvasExporter.SaveCanvas(sceneRoot, filePath, overrides))
+        {
+            return false;
+        }
+
+        if (updateActivePath)
+        {
+            SetActiveFilePath(filePath);
+        }
+
+        return true;
+    }
+
+    private void SetActiveFilePath(string? path)
+    {
+        _activeFilePath = path ?? string.Empty;
+        UpdateActiveFileLabel();
+    }
+
+    private void UpdateActiveFileLabel()
+    {
+        _activeFileLabel ??= _toolbar?.GetNodeOrNull<Label>("ActiveFileLabel");
+        if (_activeFileLabel == null)
+        {
+            return;
+        }
+
+        var displayName = string.IsNullOrEmpty(_activeFilePath)
+            ? "Unsaved Scene"
+            : IOPath.GetFileName(_activeFilePath);
+        _activeFileLabel.Text = $"Editing: {displayName}";
+    }
+
     private void EnsureToolButtons()
     {
         _toolButtonGroup ??= new ButtonGroup();
@@ -311,8 +370,21 @@ public partial class InGameEditorUI : CanvasLayer
 
     private void EnsureActionButtons()
     {
+        _saveButton ??= _toolbar?.GetNodeOrNull<Button>("SaveButton");
         _exportButton ??= _toolbar?.GetNodeOrNull<Button>("ExportButton");
         _importButton ??= _toolbar?.GetNodeOrNull<Button>("ImportButton");
+        _activeFileLabel ??= _toolbar?.GetNodeOrNull<Label>("ActiveFileLabel");
+
+        if (_saveButton == null)
+        {
+            _saveButton = new Button
+            {
+                Name = "SaveButton",
+                Text = "Save",
+                FocusMode = Control.FocusModeEnum.None
+            };
+            _toolbar?.AddChild(_saveButton);
+        }
 
         if (_exportButton == null)
         {
@@ -336,10 +408,23 @@ public partial class InGameEditorUI : CanvasLayer
             _toolbar?.AddChild(_importButton);
         }
 
+        if (_activeFileLabel == null)
+        {
+            _activeFileLabel = new Label
+            {
+                Name = "ActiveFileLabel",
+                Text = "Editing: Unsaved Scene"
+            };
+            _toolbar?.AddChild(_activeFileLabel);
+        }
+
+        _saveButton.Pressed -= OnSaveButtonPressed;
+        _saveButton.Pressed += OnSaveButtonPressed;
         _exportButton.Pressed -= OnExportButtonPressed;
         _exportButton.Pressed += OnExportButtonPressed;
         _importButton.Pressed -= OnImportButtonPressed;
         _importButton.Pressed += OnImportButtonPressed;
+        UpdateActiveFileLabel();
     }
 
     private static void ConfigureDialog(FileDialog? dialog, FileDialog.FileSelectedEventHandler handler)

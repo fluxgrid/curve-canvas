@@ -32,11 +32,17 @@ toggle_mode = true
 text = "Prop Brush"
 toggle_mode = true
 
+[node name="SaveButton" type="Button" parent="UiRoot/Toolbar"]
+text = "Save"
+
 [node name="ExportButton" type="Button" parent="UiRoot/Toolbar"]
 text = "Export Canvas"
 
 [node name="ImportButton" type="Button" parent="UiRoot/Toolbar"]
 text = "Import Canvas"
+
+[node name="ActiveFileLabel" type="Label" parent="UiRoot/Toolbar"]
+text = "Editing: Unsaved Scene"
 
 [node name="ExportDialog" type="FileDialog" parent="UiRoot"]
 visible = false

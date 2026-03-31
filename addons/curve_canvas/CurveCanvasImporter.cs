@@ -19,13 +19,8 @@ public static class CurveCanvasImporter
     };
 
     /// <summary>
-    /// Rebuilds camera trigger nodes from a serialized CurveCanvas payload.
+    /// Rebuilds camera trigger nodes from a serialized CurveCanvas payload stored on disk.
     /// </summary>
-    /// <param name="filePath">The JSON export path (res:// preferred).</param>
-    /// <param name="rootNode">Scene graph node that should own the imported triggers.</param>
-    /// <param name="triggerPrefab">Prefab instantiated for each trigger entry.</param>
-    /// <param name="undoRedo">Optional undo stack to wrap trigger placement.</param>
-    /// <param name="metadataPanel">Optional level metadata panel to populate after loading.</param>
     public static void LoadCanvas(string filePath, Node rootNode, PackedScene triggerPrefab, UndoRedo? undoRedo = null, LevelMetadataPanel? metadataPanel = null)
     {
         if (string.IsNullOrWhiteSpace(filePath))
@@ -34,6 +29,31 @@ public static class CurveCanvasImporter
             return;
         }
 
+        if (!FileAccess.FileExists(filePath))
+        {
+            GD.PushError($"[CurveCanvasImporter] File '{filePath}' was not found.");
+            return;
+        }
+
+        string json;
+        try
+        {
+            json = FileAccess.GetFileAsString(filePath);
+        }
+        catch (Exception ex)
+        {
+            GD.PushError($"[CurveCanvasImporter] Failed to read '{filePath}': {ex.Message}");
+            return;
+        }
+
+        LoadCanvasFromString(json, rootNode, triggerPrefab, undoRedo, metadataPanel, filePath);
+    }
+
+    /// <summary>
+    /// Rebuilds camera trigger nodes from an in-memory JSON payload.
+    /// </summary>
+    public static void LoadCanvasFromString(string json, Node rootNode, PackedScene triggerPrefab, UndoRedo? undoRedo = null, LevelMetadataPanel? metadataPanel = null, string? sourceName = null)
+    {
         if (rootNode == null)
         {
             GD.PushError("[CurveCanvasImporter] rootNode is required to load CurveCanvas data.");
@@ -46,16 +66,17 @@ public static class CurveCanvasImporter
             return;
         }
 
-        if (!FileAccess.FileExists(filePath))
+        if (string.IsNullOrWhiteSpace(json))
         {
-            GD.PushError($"[CurveCanvasImporter] File '{filePath}' was not found.");
+            GD.PushError("[CurveCanvasImporter] JSON payload is empty; nothing to load.");
             return;
         }
 
-        var data = DeserializeCanvasData(filePath);
+        var data = DeserializeCanvasData(json);
         if (data == null)
         {
-            GD.PushError($"[CurveCanvasImporter] '{filePath}' could not be parsed into CurveCanvas data.");
+            var label = string.IsNullOrEmpty(sourceName) ? "payload" : sourceName;
+            GD.PushError($"[CurveCanvasImporter] '{label}' could not be parsed into CurveCanvas data.");
             return;
         }
         ApplyMetadata(metadataPanel, data.Metadata);
@@ -118,10 +139,11 @@ public static class CurveCanvasImporter
             undoRedo.AddDoMethod(Callable.From(() => triggerNode.SetGlobalTransform(transform)));
             undoRedo.AddUndoMethod(Callable.From(() => container.RemoveChild(triggerNode)));
             undoRedo.AddUndoReference(triggerNode);
-            undoRedo.CommitAction();
+                undoRedo.CommitAction();
         }
 
-        GD.Print($"[CurveCanvasImporter] Rebuilt {triggers.Count} camera trigger(s) from {filePath}.");
+        var messageLabel = string.IsNullOrEmpty(sourceName) ? "payload" : sourceName;
+        GD.Print($"[CurveCanvasImporter] Rebuilt {triggers.Count} camera trigger(s) from {messageLabel}.");
     }
 
     private static void ApplyMetadata(LevelMetadataPanel? metadataPanel, CurveCanvasMetadata? metadata)
@@ -137,16 +159,15 @@ public static class CurveCanvasImporter
         metadataPanel.ApplyMetadata(levelName, author, parTime);
     }
 
-    private static CurveCanvasExportData? DeserializeCanvasData(string filePath)
+    private static CurveCanvasExportData? DeserializeCanvasData(string json)
     {
         try
         {
-            var json = FileAccess.GetFileAsString(filePath);
             return JsonSerializer.Deserialize<CurveCanvasExportData>(json, JsonOptions);
         }
         catch (Exception ex)
         {
-            GD.PushError($"[CurveCanvasImporter] Failed to read '{filePath}': {ex.Message}");
+            GD.PushError($"[CurveCanvasImporter] Failed to parse CurveCanvas payload: {ex.Message}");
             return null;
         }
     }

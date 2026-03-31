@@ -23,13 +23,6 @@ public static class CurveCanvasExporter
             return false;
         }
 
-        var track = CurveCanvasExportCommon.FindTrackGenerator(sceneRoot);
-        if (track?.Curve == null)
-        {
-            GD.PushError("[CurveCanvasExporter] TrackMeshGenerator with a valid Curve is required.");
-            return false;
-        }
-
         var targetPath = string.IsNullOrWhiteSpace(exportPath)
             ? $"{ExportFolder}/{CurveCanvasExportCommon.GetSceneName(sceneRoot)}{FileExtension}"
             : exportPath;
@@ -40,20 +33,51 @@ public static class CurveCanvasExporter
             return false;
         }
 
+        var json = SerializeCanvasToString(sceneRoot, metadataOverrides);
+        if (string.IsNullOrEmpty(json))
+        {
+            return false;
+        }
+
         try
         {
-            var exportData = BuildExportPayload(track, sceneRoot, metadataOverrides);
-            var options = new JsonSerializerOptions { WriteIndented = true };
-            var json = JsonSerializer.Serialize(exportData, options);
             using var file = Godot.FileAccess.Open(targetPath, Godot.FileAccess.ModeFlags.Write);
             file.StoreString(json);
-            GD.Print($"[CurveCanvasExporter] Exported {exportData.Spline.Count} points, {exportData.ActionObjects.Count} action objects, {exportData.SceneryObjects.Count} scenery items, and {exportData.CameraTriggers.Count} camera triggers to {targetPath}");
+            GD.Print($"[CurveCanvasExporter] Saved canvas to {targetPath}");
             return true;
         }
         catch (Exception ex)
         {
             GD.PushError($"[CurveCanvasExporter] Failed to write export file: {ex.Message}");
             return false;
+        }
+    }
+
+    public static string SerializeCanvasToString(Node sceneRoot, CurveCanvasMetadata? metadataOverrides = null)
+    {
+        if (sceneRoot == null)
+        {
+            GD.PushError("[CurveCanvasExporter] Scene root cannot be null.");
+            return string.Empty;
+        }
+
+        var track = CurveCanvasExportCommon.FindTrackGenerator(sceneRoot);
+        if (track?.Curve == null)
+        {
+            GD.PushError("[CurveCanvasExporter] TrackMeshGenerator with a valid Curve is required.");
+            return string.Empty;
+        }
+
+        try
+        {
+            var exportData = BuildExportPayload(track, sceneRoot, metadataOverrides);
+            var options = new JsonSerializerOptions { WriteIndented = true };
+            return JsonSerializer.Serialize(exportData, options);
+        }
+        catch (Exception ex)
+        {
+            GD.PushError($"[CurveCanvasExporter] Failed to serialize canvas: {ex.Message}");
+            return string.Empty;
         }
     }
 
