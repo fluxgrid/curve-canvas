@@ -28,7 +28,7 @@ public partial class CurveCanvasExporter : EditorScript
         SaveCanvas(sceneRoot);
     }
 
-    public static bool SaveCanvas(Node sceneRoot, string? exportPath = null)
+    public static bool SaveCanvas(Node sceneRoot, string? exportPath = null, CurveCanvasMetadata? metadataOverrides = null)
     {
         if (sceneRoot == null)
         {
@@ -55,7 +55,7 @@ public partial class CurveCanvasExporter : EditorScript
 
         try
         {
-            var exportData = BuildExportPayload(track, sceneRoot);
+            var exportData = BuildExportPayload(track, sceneRoot, metadataOverrides);
             var options = new JsonSerializerOptions { WriteIndented = true };
             var json = JsonSerializer.Serialize(exportData, options);
             using var file = Godot.FileAccess.Open(targetPath, Godot.FileAccess.ModeFlags.Write);
@@ -70,7 +70,7 @@ public partial class CurveCanvasExporter : EditorScript
         }
     }
 
-    private static CurveCanvasExportData BuildExportPayload(TrackMeshGenerator track, Node sceneRoot)
+    private static CurveCanvasExportData BuildExportPayload(TrackMeshGenerator track, Node sceneRoot, CurveCanvasMetadata? metadataOverrides)
     {
         var payload = new CurveCanvasExportData
         {
@@ -87,7 +87,21 @@ public partial class CurveCanvasExporter : EditorScript
             CameraTriggers = CollectCameraTriggers(sceneRoot)
         };
 
+        ApplyMetadataOverrides(payload.Metadata, metadataOverrides);
         return payload;
+    }
+
+    private static void ApplyMetadataOverrides(CurveCanvasMetadata metadata, CurveCanvasMetadata? overrides)
+    {
+        metadata.LevelName = Sanitize(overrides?.LevelName, metadata.SceneName);
+        metadata.Author = Sanitize(overrides?.Author, "Anonymous");
+        var parTime = overrides?.ParTimeSeconds ?? metadata.ParTimeSeconds;
+        metadata.ParTimeSeconds = Math.Max(1f, parTime);
+    }
+
+    private static string Sanitize(string? value, string fallback)
+    {
+        return string.IsNullOrWhiteSpace(value) ? fallback : value;
     }
 
     private static List<CurveCanvasSplinePoint> CollectSplinePoints(TrackMeshGenerator track)

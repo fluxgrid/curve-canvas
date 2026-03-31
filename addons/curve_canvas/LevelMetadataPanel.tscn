@@ -1,0 +1,76 @@
+[gd_scene format=4 uid="uid://l4vqhfivlnn3"]
+
+[ext_resource type="Script" path="res://addons/curve_canvas/LevelMetadataPanel.cs" id="1_19ovf"]
+
+[node name="LevelMetadataPanel" type="CanvasLayer"]
+script = ExtResource("1_19ovf")
+layer = 10
+LevelNameInputPath = NodePath("MarginContainer/PanelContainer/VBoxContainer/LevelNameRow/LevelNameInput")
+AuthorInputPath = NodePath("MarginContainer/PanelContainer/VBoxContainer/AuthorRow/AuthorInput")
+ParTimeInputPath = NodePath("MarginContainer/PanelContainer/VBoxContainer/ParTimeRow/ParTimeInput")
+
+[node name="MarginContainer" type="MarginContainer" parent="."]
+offset_left = 32.0
+offset_top = 32.0
+offset_right = 384.0
+offset_bottom = 0.0
+anchor_right = 0.0
+anchor_bottom = 0.0
+
+[node name="PanelContainer" type="PanelContainer" parent="MarginContainer"]
+size_flags_horizontal = 3
+size_flags_vertical = 1
+
+[node name="VBoxContainer" type="VBoxContainer" parent="MarginContainer/PanelContainer"]
+offset_left = 8.0
+offset_top = 8.0
+offset_right = 320.0
+offset_bottom = 160.0
+size_flags_horizontal = 3
+size_flags_vertical = 1
+theme_override_constants/separation = 8
+
+[node name="Header" type="Label" parent="MarginContainer/PanelContainer/VBoxContainer"]
+text = "Level Metadata"
+theme_override_font_sizes/font_size = 18
+
+[node name="LevelNameRow" type="HBoxContainer" parent="MarginContainer/PanelContainer/VBoxContainer"]
+size_flags_horizontal = 3
+theme_override_constants/separation = 8
+
+[node name="LevelNameLabel" type="Label" parent="MarginContainer/PanelContainer/VBoxContainer/LevelNameRow"]
+text = "Level Name"
+size_flags_horizontal = 1
+
+[node name="LevelNameInput" type="LineEdit" parent="MarginContainer/PanelContainer/VBoxContainer/LevelNameRow"]
+size_flags_horizontal = 3
+placeholder_text = "Untitled Track"
+
+[node name="AuthorRow" type="HBoxContainer" parent="MarginContainer/PanelContainer/VBoxContainer"]
+size_flags_horizontal = 3
+theme_override_constants/separation = 8
+
+[node name="AuthorLabel" type="Label" parent="MarginContainer/PanelContainer/VBoxContainer/AuthorRow"]
+text = "Author"
+size_flags_horizontal = 1
+
+[node name="AuthorInput" type="LineEdit" parent="MarginContainer/PanelContainer/VBoxContainer/AuthorRow"]
+size_flags_horizontal = 3
+placeholder_text = "Anonymous"
+
+[node name="ParTimeRow" type="HBoxContainer" parent="MarginContainer/PanelContainer/VBoxContainer"]
+size_flags_horizontal = 3
+theme_override_constants/separation = 8
+
+[node name="ParTimeLabel" type="Label" parent="MarginContainer/PanelContainer/VBoxContainer/ParTimeRow"]
+text = "Par Time (s)"
+size_flags_horizontal = 1
+
+[node name="ParTimeInput" type="SpinBox" parent="MarginContainer/PanelContainer/VBoxContainer/ParTimeRow"]
+size_flags_horizontal = 3
+min_value = 5.0
+max_value = 600.0
+step = 1.0
+value = 60.0
+allow_greater = true
+suffix = "s"

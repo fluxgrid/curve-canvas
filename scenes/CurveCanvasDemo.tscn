@@ -4,6 +4,8 @@
 [ext_resource type="Script" uid="uid://dscq3txfdcnmu" path="res://addons/curve_canvas/CurveCanvasRegistry.cs" id="2_g248d"]
 [ext_resource type="Script" uid="uid://cflown0wx0sco" path="res://addons/curve_canvas/CurveCanvasStateManager.cs" id="3_5qc33"]
 
+[ext_resource type="PackedScene" path="res://addons/curve_canvas/LevelMetadataPanel.tscn" id="4_jm6xb"]
+
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_81nbn"]
 sky_horizon_color = Color(0.66224277, 0.6717428, 0.6867428, 1)
 ground_horizon_color = Color(0.66224277, 0.6717428, 0.6867428, 1)
@@ -98,3 +100,5 @@ script = ExtResource("3_5qc33")
 [node name="TrajectoryGhost" type="Node3D" parent="." unique_id=1713237919]
 
 [node name="SetPieceTrigger" type="Area3D" parent="." unique_id=1183745527]
+
+[node name="LevelMetadataPanel" parent="." instance=ExtResource("4_jm6xb")]

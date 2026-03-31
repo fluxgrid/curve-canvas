@@ -57,7 +57,8 @@ public partial class CurveCanvasImporter : EditorScript
     /// <param name="rootNode">Scene graph node that should own the imported triggers.</param>
     /// <param name="triggerPrefab">Prefab instantiated for each trigger entry.</param>
     /// <param name="undoRedo">Optional undo stack to wrap trigger placement.</param>
-    public static void LoadCanvas(string filePath, Node rootNode, PackedScene triggerPrefab, EditorUndoRedoManager? undoRedo = null)
+    /// <param name="metadataPanel">Optional level metadata panel to populate after loading.</param>
+    public static void LoadCanvas(string filePath, Node rootNode, PackedScene triggerPrefab, EditorUndoRedoManager? undoRedo = null, LevelMetadataPanel? metadataPanel = null)
     {
         if (string.IsNullOrWhiteSpace(filePath))
         {
@@ -89,6 +90,7 @@ public partial class CurveCanvasImporter : EditorScript
             GD.PushError($"[CurveCanvasImporter] '{filePath}' could not be parsed into CurveCanvas data.");
             return;
         }
+        ApplyMetadata(metadataPanel, data.Metadata);
 
         var owner = ResolveOwner(rootNode);
         var container = EnsureTriggerContainer(rootNode, owner);
@@ -152,6 +154,19 @@ public partial class CurveCanvasImporter : EditorScript
         }
 
         GD.Print($"[CurveCanvasImporter] Rebuilt {triggers.Count} camera trigger(s) from {filePath}.");
+    }
+
+    private static void ApplyMetadata(LevelMetadataPanel? metadataPanel, CurveCanvasMetadata? metadata)
+    {
+        if (metadataPanel == null || metadata == null)
+        {
+            return;
+        }
+
+        var levelName = string.IsNullOrWhiteSpace(metadata.LevelName) ? metadata.SceneName : metadata.LevelName;
+        var author = string.IsNullOrWhiteSpace(metadata.Author) ? "Anonymous" : metadata.Author;
+        var parTime = metadata.ParTimeSeconds <= 0f ? 60f : metadata.ParTimeSeconds;
+        metadataPanel.ApplyMetadata(levelName, author, parTime);
     }
 
     private static CurveCanvasExportData? DeserializeCanvasData(string filePath)

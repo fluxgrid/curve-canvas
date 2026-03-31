@@ -26,6 +26,9 @@ public sealed class CurveCanvasMetadata
     public string SceneName { get; set; } = string.Empty;
     public string ExportedAtUtc { get; set; } = DateTime.UtcNow.ToString("o");
     public string ToolVersion { get; set; } = "0.1.0";
+    public string LevelName { get; set; } = "Untitled Track";
+    public string Author { get; set; } = "Anonymous";
+    public float ParTimeSeconds { get; set; } = 60f;
 }
 
 public sealed class CameraTriggerData

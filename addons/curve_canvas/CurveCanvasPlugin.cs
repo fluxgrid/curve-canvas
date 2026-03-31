@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using CurveCanvas.AuthoringCore;
 using Godot;
 
 namespace CurveCanvas.Editor;
@@ -21,6 +22,7 @@ public partial class CurveCanvasPlugin : EditorPlugin
     private Button? _importButton;
     private EditorFileDialog? _exportDialog;
     private EditorFileDialog? _importDialog;
+    private LevelMetadataPanel? _metadataPanel;
 
     public override void _EnterTree()
     {
@@ -38,6 +40,7 @@ public partial class CurveCanvasPlugin : EditorPlugin
         _propBrushMode = false;
         DestroyToolbar();
         DestroyDialogs();
+        _metadataPanel = null;
     }
 
     public override bool _Handles(GodotObject @object)
@@ -269,15 +272,18 @@ public partial class CurveCanvasPlugin : EditorPlugin
         var sceneRoot = EditorInterface.Singleton?.GetEditedSceneRoot();
         if (sceneRoot == null)
         {
+            _metadataPanel = null;
             return;
         }
 
         var tree = sceneRoot.GetTree();
         if (tree == null)
         {
+            _metadataPanel = null;
             return;
         }
 
+        _metadataPanel = FindMetadataPanel(sceneRoot);
         var undoRedo = GetUndoRedo();
         var multiplexers = new List<RuntimeInputMultiplexer>();
         CollectMultiplexers(sceneRoot, multiplexers);
@@ -298,6 +304,69 @@ public partial class CurveCanvasPlugin : EditorPlugin
         {
             CollectMultiplexers(child, results);
         }
+    }
+
+    private LevelMetadataPanel? ResolveMetadataPanel(Node sceneRoot)
+    {
+        if (_metadataPanel != null && GodotObject.IsInstanceValid(_metadataPanel))
+        {
+            return _metadataPanel;
+        }
+
+        _metadataPanel = FindMetadataPanel(sceneRoot);
+        return _metadataPanel;
+    }
+
+    private LevelMetadataPanel? FindMetadataPanel(Node sceneRoot)
+    {
+        var tree = sceneRoot.GetTree();
+        if (tree != null)
+        {
+            var members = tree.GetNodesInGroup(LevelMetadataPanel.MetadataPanelGroup);
+            foreach (var member in members)
+            {
+                if (member is LevelMetadataPanel panel && GodotObject.IsInstanceValid(panel))
+                {
+                    return panel;
+                }
+            }
+        }
+
+        return FindMetadataPanelRecursive(sceneRoot);
+    }
+
+    private LevelMetadataPanel? FindMetadataPanelRecursive(Node node)
+    {
+        if (node is LevelMetadataPanel panel)
+        {
+            return panel;
+        }
+
+        foreach (Node child in node.GetChildren())
+        {
+            var match = FindMetadataPanelRecursive(child);
+            if (match != null)
+            {
+                return match;
+            }
+        }
+
+        return null;
+    }
+
+    private static CurveCanvasMetadata? BuildMetadataOverrides(LevelMetadataPanel? panel)
+    {
+        if (panel == null)
+        {
+            return null;
+        }
+
+        return new CurveCanvasMetadata
+        {
+            LevelName = panel.LevelName,
+            Author = panel.Author,
+            ParTimeSeconds = panel.ParTimeSeconds
+        };
     }
 
     private void CreateToolbar()
@@ -447,7 +516,9 @@ public partial class CurveCanvasPlugin : EditorPlugin
             return;
         }
 
-        CurveCanvasExporter.SaveCanvas(sceneRoot, path);
+        var metadataPanel = ResolveMetadataPanel(sceneRoot);
+        var overrides = BuildMetadataOverrides(metadataPanel);
+        CurveCanvasExporter.SaveCanvas(sceneRoot, path, overrides);
     }
 
     private void OnImportFileSelected(string path)
@@ -471,6 +542,7 @@ public partial class CurveCanvasPlugin : EditorPlugin
             return;
         }
 
-        CurveCanvasImporter.LoadCanvas(path, sceneRoot, triggerPrefab, GetUndoRedo());
+        var metadataPanel = ResolveMetadataPanel(sceneRoot);
+        CurveCanvasImporter.LoadCanvas(path, sceneRoot, triggerPrefab, GetUndoRedo(), metadataPanel);
     }
 }
