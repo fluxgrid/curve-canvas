@@ -31,6 +31,8 @@ public partial class RuntimeInputMultiplexer : Node
     [Export(PropertyHint.Range, "0.25,20,0.25")]
     public float PropBrushFallbackInterval { get; set; } = 3.0f;
 
+    private const float HandleRayLength = 4096f;
+
     public SandboxState CurrentState => _currentState;
 
     private SandboxState _currentState = SandboxState.Select;
@@ -47,6 +49,9 @@ public partial class RuntimeInputMultiplexer : Node
     private bool _currentStrokeIsErase;
     private Node? _strokeContainer;
     private Node? _strokeOwner;
+    private int _draggedPointIndex = -1;
+    private Vector3 _dragStartPosition = Vector3.Zero;
+    private Vector3 _dragCurrentPosition = Vector3.Zero;
 
     public override void _Ready()
     {
@@ -106,19 +111,34 @@ public partial class RuntimeInputMultiplexer : Node
 
     private void HandleSelect(Vector3 position)
     {
-        GD.Print($"[RuntimeInputMultiplexer] Select placeholder at {position}");
+        // Selection behavior is driven through spline handles.
+        _ = position;
     }
 
     private void HandleDrawSpline(Vector3 position)
     {
-        var canvas = GetCurveCanvas();
-        if (canvas != null && canvas.HasMethod("AddPoint"))
+        var track = GetTrackGenerator();
+        var curve = track?.Curve;
+        if (curve == null)
         {
-            canvas.Call("AddPoint", position);
             return;
         }
 
-        GD.Print($"[RuntimeInputMultiplexer] CurveCanvas.AddPoint placeholder at {position}");
+        position.Z = 0f;
+        var insertionIndex = curve.GetPointCount();
+
+        if (_undoRedo == null)
+        {
+            curve.AddPoint(position);
+            return;
+        }
+
+        var curveRef = curve;
+        var point = position;
+        _undoRedo.CreateAction("Add Track Point");
+        _undoRedo.AddDoMethod(Callable.From(() => curveRef.AddPoint(point)));
+        _undoRedo.AddUndoMethod(Callable.From(() => curveRef.RemovePoint(insertionIndex)));
+        _undoRedo.CommitAction();
     }
 
     private void HandlePropBrush(Vector3 position, bool isDrag)
@@ -248,6 +268,13 @@ public partial class RuntimeInputMultiplexer : Node
             {
                 BeginPropStroke();
             }
+
+            if (_currentState == SandboxState.Select && TryBeginHandleDrag(mouseButton.Position))
+            {
+                GetViewport()?.SetInputAsHandled();
+                return;
+            }
+
             ProcessPointerEvent(mouseButton.Position, isDrag: false);
         }
         else
@@ -257,6 +284,10 @@ public partial class RuntimeInputMultiplexer : Node
             if (_currentState == SandboxState.PropBrush)
             {
                 CommitStroke();
+            }
+            else if (_draggedPointIndex != -1)
+            {
+                CommitHandleDrag();
             }
             else
             {
@@ -269,6 +300,13 @@ public partial class RuntimeInputMultiplexer : Node
     {
         if (!_isPointerDown || (mouseMotion.ButtonMask & MouseButtonMask.Left) == 0)
         {
+            return;
+        }
+
+        if (_currentState == SandboxState.Select && _draggedPointIndex != -1)
+        {
+            UpdateDraggedPoint(mouseMotion.Position);
+            GetViewport()?.SetInputAsHandled();
             return;
         }
 
@@ -289,6 +327,13 @@ public partial class RuntimeInputMultiplexer : Node
             {
                 BeginPropStroke();
             }
+
+            if (_currentState == SandboxState.Select && TryBeginHandleDrag(touchEvent.Position))
+            {
+                GetViewport()?.SetInputAsHandled();
+                return;
+            }
+
             ProcessPointerEvent(touchEvent.Position, isDrag: false);
         }
         else
@@ -298,6 +343,10 @@ public partial class RuntimeInputMultiplexer : Node
             if (_currentState == SandboxState.PropBrush)
             {
                 CommitStroke();
+            }
+            else if (_draggedPointIndex != -1)
+            {
+                CommitHandleDrag();
             }
             else
             {
@@ -557,6 +606,129 @@ public partial class RuntimeInputMultiplexer : Node
         }
 
         return node.Owner ?? node.GetTree()?.CurrentScene;
+    }
+
+    private bool TryBeginHandleDrag(Vector2 screenPosition)
+    {
+        var camera = GetRuntimeCamera();
+        var track = GetTrackGenerator();
+        var curve = track?.Curve;
+        if (camera == null || curve == null)
+        {
+            return false;
+        }
+
+        var world = camera.GetWorld3D();
+        if (world == null)
+        {
+            return false;
+        }
+
+        var origin = camera.ProjectRayOrigin(screenPosition);
+        var direction = camera.ProjectRayNormal(screenPosition);
+        var query = PhysicsRayQueryParameters3D.Create(origin, origin + direction * HandleRayLength);
+        query.CollisionMask = RuntimeSplineHandles.HandleCollisionLayer;
+        var hit = world.DirectSpaceState.IntersectRay(query);
+        if (hit.Count == 0)
+        {
+            return false;
+        }
+
+        if (!hit.TryGetValue("collider", out var colliderVariant))
+        {
+            return false;
+        }
+
+        var collider = colliderVariant.AsGodotObject() as CollisionObject3D;
+        if (collider == null)
+        {
+            return false;
+        }
+
+        Variant indexVariant = Variant.CreateNull();
+        if (collider.HasMeta("point_index"))
+        {
+            indexVariant = collider.GetMeta("point_index");
+        }
+        else if (collider.GetParent() is Node parent && parent.HasMeta("point_index"))
+        {
+            indexVariant = parent.GetMeta("point_index");
+        }
+
+        if (indexVariant.VariantType != Variant.Type.Int)
+        {
+            return false;
+        }
+
+        var index = (int)indexVariant;
+        if (index < 0 || index >= curve.GetPointCount())
+        {
+            return false;
+        }
+
+        _draggedPointIndex = index;
+        _dragStartPosition = curve.GetPointPosition(index);
+        _dragCurrentPosition = _dragStartPosition;
+        return true;
+    }
+
+    private void UpdateDraggedPoint(Vector2 screenPosition)
+    {
+        if (_draggedPointIndex < 0)
+        {
+            return;
+        }
+
+        var camera = GetRuntimeCamera();
+        var track = GetTrackGenerator();
+        var curve = track?.Curve;
+        if (camera == null || curve == null)
+        {
+            return;
+        }
+
+        var intersection = camera.GetZZeroIntersection(screenPosition);
+        if (intersection == null)
+        {
+            return;
+        }
+
+        var position = intersection.Value;
+        position.Z = 0f;
+        curve.SetPointPosition(_draggedPointIndex, position);
+        _dragCurrentPosition = position;
+    }
+
+    private void CommitHandleDrag()
+    {
+        if (_draggedPointIndex < 0)
+        {
+            return;
+        }
+
+        var track = GetTrackGenerator();
+        var curve = track?.Curve;
+        if (curve == null)
+        {
+            _draggedPointIndex = -1;
+            return;
+        }
+
+        var index = _draggedPointIndex;
+        var start = _dragStartPosition;
+        var end = _dragCurrentPosition;
+        _draggedPointIndex = -1;
+
+        if (_undoRedo == null || start.IsEqualApprox(end))
+        {
+            return;
+        }
+
+        var curveRef = curve;
+        _undoRedo.CreateAction("Move Track Point");
+        _undoRedo.AddDoMethod(Callable.From(() => curveRef.SetPointPosition(index, end)));
+        _undoRedo.AddUndoMethod(Callable.From(() => curveRef.SetPointPosition(index, start)));
+        _undoRedo.CommitAction();
     }
 
     private Node3D? CreatePropNode(Vector3 planarPosition)
