@@ -624,11 +624,14 @@ public partial class RuntimeInputMultiplexer : Node
             return false;
         }
 
+        var spaceState = world.DirectSpaceState;
         var origin = camera.ProjectRayOrigin(screenPosition);
         var direction = camera.ProjectRayNormal(screenPosition);
-        var query = PhysicsRayQueryParameters3D.Create(origin, origin + direction * HandleRayLength);
-        query.CollisionMask = RuntimeSplineHandles.HandleCollisionLayer;
-        var hit = world.DirectSpaceState.IntersectRay(query);
+        var query = PhysicsRayQueryParameters3D.Create(origin, origin + direction * 1000f);
+        query.CollideWithAreas = true;
+        query.CollideWithBodies = false;
+        query.CollisionMask = RuntimeSplineHandles.HANDLE_COLLISION_LAYER;
+        var hit = spaceState.IntersectRay(query);
         if (hit.Count == 0)
         {
             return false;
@@ -639,7 +642,7 @@ public partial class RuntimeInputMultiplexer : Node
             return false;
         }
 
-        var collider = colliderVariant.AsGodotObject() as CollisionObject3D;
+        var collider = colliderVariant.AsGodotObject() as Area3D;
         if (collider == null)
         {
             return false;

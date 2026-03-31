@@ -7,7 +7,7 @@ namespace CurveCanvas.Editor;
 /// </summary>
 public partial class RuntimeSplineHandles : Node3D
 {
-    public const uint HandleCollisionLayer = 1u << 15;
+    public const uint HANDLE_COLLISION_LAYER = 1u << 9;
 
     private const string HandleGroupName = "CurveCanvasSplineHandle";
 
@@ -96,7 +96,7 @@ public partial class RuntimeSplineHandles : Node3D
         var area = new Area3D
         {
             Name = "PickerArea",
-            CollisionLayer = HandleCollisionLayer,
+            CollisionLayer = HANDLE_COLLISION_LAYER,
             CollisionMask = 0
         };
         area.SetMeta("point_index", index);
