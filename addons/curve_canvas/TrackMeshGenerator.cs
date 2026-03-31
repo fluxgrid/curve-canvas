@@ -179,6 +179,12 @@ public partial class TrackMeshGenerator : Path3D
             return;
         }
 
+        // Force high-resolution baking to eliminate jagged edges in play mode
+        if (!Mathf.IsEqualApprox(Curve.BakeInterval, 0.5f))
+        {
+            Curve.BakeInterval = 0.5f;
+        }
+
         var bakedPoints = Curve.GetBakedPoints();
         if (bakedPoints.Length < 2)
         {
@@ -492,7 +498,15 @@ public partial class TrackMeshGenerator : Path3D
 
     private static Vector3 CalculateQuadNormal(Vector3 startLeft, Vector3 startRight, Vector3 endLeft)
     {
-        return new Vector3(0f, 0f, 1f);
+        var edge1 = startRight - startLeft;
+        var edge2 = endLeft - startLeft;
+        var normal = edge1.Cross(edge2);
+        if (normal.LengthSquared() <= Mathf.Epsilon)
+        {
+            return Vector3.Up;
+        }
+
+        return normal.Normalized();
     }
 
     private readonly record struct MeshBuildSettings(
