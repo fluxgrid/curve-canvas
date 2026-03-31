@@ -85,10 +85,11 @@ public static class CurveCanvasImporter
         var container = EnsureTriggerContainer(rootNode, owner);
         ClearExistingTriggers(container);
 
+        var sourceLabel = string.IsNullOrEmpty(sourceName) ? "payload" : sourceName;
         var triggers = data.CameraTriggers ?? new List<CameraTriggerData>();
         if (triggers.Count == 0)
         {
-            GD.Print($"[CurveCanvasImporter] No camera triggers found in '{filePath}'.");
+            GD.Print($"[CurveCanvasImporter] No camera triggers found in '{sourceLabel}'.");
             return;
         }
 
@@ -142,8 +143,7 @@ public static class CurveCanvasImporter
                 undoRedo.CommitAction();
         }
 
-        var messageLabel = string.IsNullOrEmpty(sourceName) ? "payload" : sourceName;
-        GD.Print($"[CurveCanvasImporter] Rebuilt {triggers.Count} camera trigger(s) from {messageLabel}.");
+        GD.Print($"[CurveCanvasImporter] Rebuilt {triggers.Count} camera trigger(s) from {sourceLabel}.");
     }
 
     private static void ApplyMetadata(LevelMetadataPanel? metadataPanel, CurveCanvasMetadata? metadata)
