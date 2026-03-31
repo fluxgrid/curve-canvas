@@ -6,5 +6,6 @@
     {"id": 15, "name": "Create a basic CameraTrigger prefab (.tscn) with an attached script for testing the importer."},
     {"id": 16, "name": "Add UI controls (Import/Export buttons) to the CurveCanvasEditor dock to execute LoadCanvas and SaveCanvas."},
     {"id": 17, "name": "Implement EditorFileDialog for dynamic saving and loading of CurveCanvas levels."},
-    {"id": 18, "name": "Implement Stroke Batching and EditorUndoRedoManager coverage for Prop Brush and Camera Triggers."}
+    {"id": 18, "name": "Implement Stroke Batching and EditorUndoRedoManager coverage for Prop Brush and Camera Triggers."},
+    {"id": 19, "name": "Perform 'Editor Exorcism': Migrate UndoRedo, FileDialog, and UI to runtime-safe equivalents for in-game editing."}
 ]
