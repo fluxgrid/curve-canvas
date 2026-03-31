@@ -25,9 +25,20 @@ public partial class CurveCanvasGameManager : Node
     [Export]
     public NodePath MetadataPanelPath { get; set; } = new("../LevelMetadataPanel");
 
+    [Export]
+    public NodePath EditorUiPath { get; set; } = new("../InGameEditorUI");
+
+    [Export]
+    public NodePath TrackGeneratorPath { get; set; } = new("../TrackGenerator");
+
+    [Export(PropertyHint.GlobalFile, "*.curvecanvas.json")]
+    public string StartupLevelPath { get; set; } = "user://default_level.curvecanvas.json";
+
     private CurveCanvasStateManager? _stateManager;
     private Node? _sceneRoot;
     private LevelMetadataPanel? _metadataPanel;
+    private InGameEditorUI? _editorUI;
+    private TrackMeshGenerator? _trackGenerator;
     private PackedScene? _triggerPrefab;
     private string _editStateSnapshot = string.Empty;
     private GameState _currentState = GameState.Editing;
@@ -37,7 +48,10 @@ public partial class CurveCanvasGameManager : Node
         _stateManager = GetNodeOrNull<CurveCanvasStateManager>(StateManagerPath);
         _sceneRoot = ResolveSceneRoot();
         _metadataPanel = GetNodeOrNull<LevelMetadataPanel>(MetadataPanelPath);
+        _editorUI = GetNodeOrNull<InGameEditorUI>(EditorUiPath);
+        _trackGenerator = ResolveTrackGenerator();
         _triggerPrefab = ResourceLoader.Load<PackedScene>(TriggerPrefabPath);
+        InitializeStartupLevel();
 
         if (_stateManager != null)
         {
@@ -157,6 +171,70 @@ public partial class CurveCanvasGameManager : Node
         }
 
         return _sceneRoot;
+    }
+
+    private TrackMeshGenerator? ResolveTrackGenerator()
+    {
+        if (_trackGenerator != null && IsInstanceValid(_trackGenerator))
+        {
+            return _trackGenerator;
+        }
+
+        if (TrackGeneratorPath.IsEmpty)
+        {
+            return null;
+        }
+
+        _trackGenerator = GetNodeOrNull<TrackMeshGenerator>(TrackGeneratorPath);
+        return _trackGenerator;
+    }
+
+    private void InitializeStartupLevel()
+    {
+        var root = ResolveSceneRoot();
+        if (root == null)
+        {
+            GD.PushWarning("[CurveCanvasGameManager] Cannot initialize startup level; scene root missing.");
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(StartupLevelPath))
+        {
+            EnsureDefaultCurve();
+            return;
+        }
+
+        _triggerPrefab ??= ResourceLoader.Load<PackedScene>(TriggerPrefabPath);
+        if (FileAccess.FileExists(StartupLevelPath))
+        {
+            if (_triggerPrefab == null)
+            {
+                GD.PushError("[CurveCanvasGameManager] Trigger prefab missing; cannot load startup level.");
+                return;
+            }
+
+            CurveCanvasImporter.LoadCanvas(StartupLevelPath, root, _triggerPrefab, null, _metadataPanel);
+            _editorUI?.SetActiveFilePath(StartupLevelPath);
+            return;
+        }
+
+        EnsureDefaultCurve();
+        _editorUI?.SetActiveFilePath(StartupLevelPath);
+    }
+
+    private void EnsureDefaultCurve()
+    {
+        var trackGenerator = ResolveTrackGenerator();
+        if (trackGenerator?.Curve == null)
+        {
+            GD.PushWarning("[CurveCanvasGameManager] No TrackMeshGenerator with a valid Curve3D was found.");
+            return;
+        }
+
+        var curve = trackGenerator.Curve;
+        curve.ClearPoints();
+        curve.AddPoint(new Vector3(-10f, 0f, 0f));
+        curve.AddPoint(new Vector3(10f, 0f, 0f));
     }
 
     private static CurveCanvasMetadata? BuildMetadataOverrides(LevelMetadataPanel? panel)

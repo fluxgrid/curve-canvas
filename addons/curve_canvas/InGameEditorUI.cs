@@ -308,7 +308,7 @@ public partial class InGameEditorUI : CanvasLayer
         return true;
     }
 
-    private void SetActiveFilePath(string? path)
+    public void SetActiveFilePath(string? path)
     {
         _activeFilePath = path ?? string.Empty;
         UpdateActiveFileLabel();
