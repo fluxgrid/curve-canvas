@@ -478,11 +478,11 @@ public partial class TrackMeshGenerator : Path3D
             _normals.Add(normal);
 
             _indices.Add(baseIndex);
-            _indices.Add(baseIndex + 1);
             _indices.Add(baseIndex + 2);
             _indices.Add(baseIndex + 1);
+            _indices.Add(baseIndex + 1);
+            _indices.Add(baseIndex + 2);
             _indices.Add(baseIndex + 3);
-            _indices.Add(baseIndex + 2);
         }
 
         public SurfaceMeshData ToSurfaceData()
