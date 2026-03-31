@@ -10,12 +10,16 @@ AuthorInputPath = NodePath("MarginContainer/PanelContainer/VBoxContainer/AuthorR
 ParTimeInputPath = NodePath("MarginContainer/PanelContainer/VBoxContainer/ParTimeRow/ParTimeInput")
 
 [node name="MarginContainer" type="MarginContainer" parent="."]
-offset_left = 32.0
-offset_top = 32.0
-offset_right = 384.0
-offset_bottom = 0.0
-anchor_right = 0.0
+anchor_left = 1.0
+anchor_top = 0.0
+anchor_right = 1.0
 anchor_bottom = 0.0
+offset_left = -384.0
+offset_top = 32.0
+offset_right = -32.0
+offset_bottom = 224.0
+grow_horizontal = 0
+grow_vertical = 0
 
 [node name="PanelContainer" type="PanelContainer" parent="MarginContainer"]
 size_flags_horizontal = 3
