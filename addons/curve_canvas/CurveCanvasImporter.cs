@@ -80,6 +80,7 @@ public static class CurveCanvasImporter
             return;
         }
         ApplyMetadata(metadataPanel, data.Metadata);
+        ApplySpline(rootNode, data.Spline);
 
         var owner = ResolveOwner(rootNode);
         var container = EnsureTriggerContainer(rootNode, owner);
@@ -144,6 +145,30 @@ public static class CurveCanvasImporter
         }
 
         GD.Print($"[CurveCanvasImporter] Rebuilt {triggers.Count} camera trigger(s) from {sourceLabel}.");
+    }
+
+    private static void ApplySpline(Node rootNode, List<CurveCanvasSplinePoint>? splinePoints)
+    {
+        var track = CurveCanvasExportCommon.FindTrackGenerator(rootNode);
+        var curve = track?.Curve;
+        if (curve == null)
+        {
+            GD.PushWarning("[CurveCanvasImporter] TrackMeshGenerator with a valid Curve is required to rebuild the spline.");
+            return;
+        }
+
+        curve.ClearPoints();
+        if (splinePoints == null || splinePoints.Count == 0)
+        {
+            GD.Print("[CurveCanvasImporter] Spline payload was empty; cleared existing curve points.");
+            return;
+        }
+
+        foreach (var point in splinePoints)
+        {
+            var position = new Vector3(point.X, point.Y, 0f);
+            curve.AddPoint(position);
+        }
     }
 
     private static void ApplyMetadata(LevelMetadataPanel? metadataPanel, CurveCanvasMetadata? metadata)
