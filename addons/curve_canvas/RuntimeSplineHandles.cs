@@ -66,12 +66,11 @@ public partial class RuntimeSplineHandles : Node3D
             return;
         }
 
-        var owner = GetTree()?.CurrentScene ?? Owner;
         var pointCount = _curve.GetPointCount();
         for (var i = 0; i < pointCount; i++)
         {
             var position = _curve.GetPointPosition(i);
-            CreateHandle(i, position, owner);
+            CreateHandle(i, position);
         }
     }
 
@@ -83,7 +82,7 @@ public partial class RuntimeSplineHandles : Node3D
         }
     }
 
-    private void CreateHandle(int index, Vector3 position, Node? owner)
+    private void CreateHandle(int index, Vector3 position)
     {
         var handleRoot = new Node3D
         {
@@ -93,10 +92,6 @@ public partial class RuntimeSplineHandles : Node3D
         handleRoot.SetMeta("point_index", index);
         handleRoot.AddToGroup(HandleGroupName);
         AddChild(handleRoot, true);
-        if (owner != null)
-        {
-            handleRoot.Owner = owner;
-        }
 
         var area = new Area3D
         {
@@ -106,10 +101,6 @@ public partial class RuntimeSplineHandles : Node3D
         };
         area.SetMeta("point_index", index);
         handleRoot.AddChild(area, true);
-        if (owner != null)
-        {
-            area.Owner = owner;
-        }
 
         var shape = new CollisionShape3D
         {
@@ -119,10 +110,6 @@ public partial class RuntimeSplineHandles : Node3D
             }
         };
         area.AddChild(shape, true);
-        if (owner != null)
-        {
-            shape.Owner = owner;
-        }
 
         var mesh = new MeshInstance3D
         {
@@ -141,9 +128,5 @@ public partial class RuntimeSplineHandles : Node3D
         };
         mesh.MaterialOverride = material;
         handleRoot.AddChild(mesh, true);
-        if (owner != null)
-        {
-            mesh.Owner = owner;
-        }
     }
 }
