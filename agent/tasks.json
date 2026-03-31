@@ -9,5 +9,6 @@
     {"id": 18, "name": "Implement Stroke Batching and EditorUndoRedoManager coverage for Prop Brush and Camera Triggers."},
     {"id": 19, "name": "Perform 'Editor Exorcism': Migrate UndoRedo, FileDialog, and UI to runtime-safe equivalents for in-game editing."},
     {"id": 21, "name": "Implement Runtime Spline Handles and Tool Selection UI for in-game curve editing."},
-    {"id": 22, "name": "Wire the runtime editor nodes into CurveCanvasDemo.tscn and resolve UI layout overlaps."}
+    {"id": 22, "name": "Wire the runtime editor nodes into CurveCanvasDemo.tscn and resolve UI layout overlaps."},
+    {"id": 23, "name": "Fix Handle Raycasting: Isolate spline handles to a dedicated collision layer and update multiplexer raycast mask."}
 ]
