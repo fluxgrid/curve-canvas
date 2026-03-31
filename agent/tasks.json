@@ -2,5 +2,7 @@
     {"id": 11, "name": "Implement RuntimeCamera3D with Z=0 plane raycasting for viewport input"},
     {"id": 12, "name": "Build input multiplexer using _UnhandledInput to route clicks between UI and sandbox states"},
     {"id": 13, "name": "Refactor TrackMeshGenerator for asynchronous mesh and collider rebuilding"},
-    {"id": 14, "name": "Implement CurveCanvasImporter to deserialize JSON and reconstruct Camera Triggers in the scene."}
+    {"id": 14, "name": "Implement CurveCanvasImporter to deserialize JSON and reconstruct Camera Triggers in the scene."},
+    {"id": 15, "name": "Create a basic CameraTrigger prefab (.tscn) with an attached script for testing the importer."},
+    {"id": 16, "name": "Add UI controls (Import/Export buttons) to the CurveCanvasEditor dock to execute LoadCanvas and SaveCanvas."}
 ]
