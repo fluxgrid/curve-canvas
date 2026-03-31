@@ -31,6 +31,19 @@ public partial class PropBrushTool : RefCounted
 
     public bool IsStrokeActive => _strokeActive;
 
+    public override void _Notification(int what)
+    {
+        if (what == NotificationPredelete)
+        {
+            _trackPath = null;
+            _activeCurve = null;
+            _registry = null;
+            _spawnParent = null;
+        }
+
+        base._Notification(what);
+    }
+
     public void ConfigureFromTrack(TrackMeshGenerator? track)
     {
         _trackPath = track;
