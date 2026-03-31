@@ -5,7 +5,6 @@ namespace CurveCanvas.Editor;
 [Tool]
 public partial class CurveCanvasPlugin : EditorPlugin
 {
-    private const string TestExportPath = "res://Exports/test_level.curvecanvas.json";
     private const string TriggerPrefabPath = "res://addons/curve_canvas/Prefabs/CameraTrigger.tscn";
     private const float SelectionRadius = 2.0f;
     private TrackMeshGenerator? _currentTrack;
@@ -19,11 +18,14 @@ public partial class CurveCanvasPlugin : EditorPlugin
     private HBoxContainer? _toolbar;
     private Button? _exportButton;
     private Button? _importButton;
+    private EditorFileDialog? _exportDialog;
+    private EditorFileDialog? _importDialog;
 
     public override void _EnterTree()
     {
         GD.Print("CurveCanvas Initialized");
         CreateToolbar();
+        CreateDialogs();
     }
 
     public override void _ExitTree()
@@ -33,6 +35,7 @@ public partial class CurveCanvasPlugin : EditorPlugin
         _propBrushTool.CancelStroke();
         _propBrushMode = false;
         DestroyToolbar();
+        DestroyDialogs();
     }
 
     public override bool _Handles(GodotObject @object)
@@ -316,8 +319,88 @@ public partial class CurveCanvasPlugin : EditorPlugin
         _importButton = null;
     }
 
+    private void CreateDialogs()
+    {
+        var baseControl = EditorInterface.Singleton?.GetBaseControl();
+        if (baseControl == null)
+        {
+            GD.PushError("[CurveCanvasPlugin] Failed to create file dialogs: base control unavailable.");
+            return;
+        }
+
+        if (_exportDialog == null)
+        {
+            _exportDialog = new EditorFileDialog
+            {
+                Name = "CurveCanvasExportDialog",
+                FileMode = EditorFileDialog.FileModeEnum.SaveFile,
+                Access = FileDialog.AccessEnum.Resources
+            };
+            _exportDialog.AddFilter("*.curvecanvas.json", "CurveCanvas Level");
+            _exportDialog.FileSelected += OnExportFileSelected;
+            baseControl.AddChild(_exportDialog);
+        }
+
+        if (_importDialog == null)
+        {
+            _importDialog = new EditorFileDialog
+            {
+                Name = "CurveCanvasImportDialog",
+                FileMode = EditorFileDialog.FileModeEnum.OpenFile,
+                Access = FileDialog.AccessEnum.Resources
+            };
+            _importDialog.AddFilter("*.curvecanvas.json", "CurveCanvas Level");
+            _importDialog.FileSelected += OnImportFileSelected;
+            baseControl.AddChild(_importDialog);
+        }
+    }
+
+    private void DestroyDialogs()
+    {
+        if (_exportDialog != null)
+        {
+            _exportDialog.FileSelected -= OnExportFileSelected;
+            _exportDialog.QueueFree();
+            _exportDialog = null;
+        }
+
+        if (_importDialog != null)
+        {
+            _importDialog.FileSelected -= OnImportFileSelected;
+            _importDialog.QueueFree();
+            _importDialog = null;
+        }
+    }
+
     private void OnExportCanvasPressed()
     {
+        if (_exportDialog == null)
+        {
+            GD.PushError("[CurveCanvasPlugin] Export dialog unavailable.");
+            return;
+        }
+
+        _exportDialog.PopupCenteredRatio();
+    }
+
+    private void OnImportCanvasPressed()
+    {
+        if (_importDialog == null)
+        {
+            GD.PushError("[CurveCanvasPlugin] Import dialog unavailable.");
+            return;
+        }
+
+        _importDialog.PopupCenteredRatio();
+    }
+
+    private void OnExportFileSelected(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return;
+        }
+
         var sceneRoot = EditorInterface.Singleton?.GetEditedSceneRoot();
         if (sceneRoot == null)
         {
@@ -325,11 +408,16 @@ public partial class CurveCanvasPlugin : EditorPlugin
             return;
         }
 
-        CurveCanvasExporter.SaveCanvas(sceneRoot, TestExportPath);
+        CurveCanvasExporter.SaveCanvas(sceneRoot, path);
     }
 
-    private void OnImportCanvasPressed()
+    private void OnImportFileSelected(string path)
     {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return;
+        }
+
         var sceneRoot = EditorInterface.Singleton?.GetEditedSceneRoot();
         if (sceneRoot == null)
         {
@@ -344,6 +432,6 @@ public partial class CurveCanvasPlugin : EditorPlugin
             return;
         }
 
-        CurveCanvasImporter.LoadCanvas(TestExportPath, sceneRoot, triggerPrefab);
+        CurveCanvasImporter.LoadCanvas(path, sceneRoot, triggerPrefab);
     }
 }
