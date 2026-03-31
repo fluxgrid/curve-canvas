@@ -190,7 +190,7 @@ public partial class TrajectoryGhostRenderer : Node3D
 
         if (Engine.IsEditorHint())
         {
-            var owner = GetTree()?.EditedSceneRoot ?? GetOwner();
+            var owner = GetTree()?.CurrentScene ?? GetOwner();
             if (owner != null)
             {
                 _ghostMesh.Owner = owner;

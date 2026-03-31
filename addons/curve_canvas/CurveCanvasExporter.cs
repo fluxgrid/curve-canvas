@@ -10,23 +10,10 @@ namespace CurveCanvas.Editor;
 /// <summary>
 /// Serializes the active CurveCanvas scene graph into a portable JSON payload.
 /// </summary>
-[Tool]
-public partial class CurveCanvasExporter : EditorScript
+public static class CurveCanvasExporter
 {
     private const string ExportFolder = "res://Exports";
     private const string FileExtension = ".curvecanvas.json";
-
-    public override void _Run()
-    {
-        var sceneRoot = EditorInterface.Singleton?.GetEditedSceneRoot();
-        if (sceneRoot == null)
-        {
-            GD.PushError("[CurveCanvasExporter] No open scene to export.");
-            return;
-        }
-
-        SaveCanvas(sceneRoot);
-    }
 
     public static bool SaveCanvas(Node sceneRoot, string? exportPath = null, CurveCanvasMetadata? metadataOverrides = null)
     {

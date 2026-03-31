@@ -38,7 +38,7 @@ public partial class RuntimeInputMultiplexer : Node
     private GodotObject? _curveCanvas;
     private TrackMeshGenerator? _trackGenerator;
     private Node? _propContainer;
-    private EditorUndoRedoManager? _undoRedo;
+    private UndoRedo? _undoRedo;
     private bool _isPointerDown;
     private bool _propStrokeActive;
     private Vector3? _lastPropSpawnPosition;
@@ -77,7 +77,7 @@ public partial class RuntimeInputMultiplexer : Node
         _currentState = newState;
     }
 
-    public void ConfigureUndoRedo(EditorUndoRedoManager? undoRedo)
+    public void ConfigureUndoRedo(UndoRedo? undoRedo)
     {
         _undoRedo = undoRedo;
     }
@@ -481,12 +481,12 @@ public partial class RuntimeInputMultiplexer : Node
         {
             foreach (var node in _currentStrokeNodes)
             {
-                _undoRedo.AddDoMethod(container, Node.MethodName.RemoveChild, node);
+                _undoRedo.AddDoMethod(Callable.From(() => container.RemoveChild(node)));
                 _undoRedo.AddDoReference(node);
-                _undoRedo.AddUndoMethod(container, Node.MethodName.AddChild, node);
+                _undoRedo.AddUndoMethod(Callable.From(() => container.AddChild(node)));
                 if (_strokeOwner != null)
                 {
-                    _undoRedo.AddUndoMethod(node, Node.MethodName.SetOwner, _strokeOwner);
+                    _undoRedo.AddUndoMethod(Callable.From(() => node.SetOwner(_strokeOwner)));
                 }
             }
         }
@@ -494,12 +494,13 @@ public partial class RuntimeInputMultiplexer : Node
         {
             foreach (var node in _currentStrokeNodes)
             {
-                _undoRedo.AddDoMethod(container, Node.MethodName.AddChild, node);
+                _undoRedo.AddDoMethod(Callable.From(() => container.AddChild(node)));
                 if (_strokeOwner != null)
                 {
-                    _undoRedo.AddDoMethod(node, Node.MethodName.SetOwner, _strokeOwner);
+                    var owner = _strokeOwner;
+                    _undoRedo.AddDoMethod(Callable.From(() => node.SetOwner(owner)));
                 }
-                _undoRedo.AddUndoMethod(container, Node.MethodName.RemoveChild, node);
+                _undoRedo.AddUndoMethod(Callable.From(() => container.RemoveChild(node)));
                 _undoRedo.AddUndoReference(node);
             }
         }
@@ -555,7 +556,7 @@ public partial class RuntimeInputMultiplexer : Node
             return null;
         }
 
-        return node.Owner ?? node.GetTree()?.EditedSceneRoot;
+        return node.Owner ?? node.GetTree()?.CurrentScene;
     }
 
     private Node3D? CreatePropNode(Vector3 planarPosition)

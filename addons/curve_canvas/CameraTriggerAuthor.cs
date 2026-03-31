@@ -189,7 +189,7 @@ public partial class CameraTriggerAuthor : Area3D
             AddChild(_collisionShape, true);
             if (Engine.IsEditorHint())
             {
-                var owner = Owner ?? GetTree()?.EditedSceneRoot;
+                var owner = Owner ?? GetTree()?.CurrentScene;
                 if (owner != null)
                 {
                     _collisionShape.Owner = owner;
@@ -232,7 +232,7 @@ public partial class CameraTriggerAuthor : Area3D
 
         if (Engine.IsEditorHint())
         {
-            var owner = Owner ?? GetTree()?.EditedSceneRoot;
+            var owner = Owner ?? GetTree()?.CurrentScene;
             if (owner != null)
             {
                 _linkMesh.Owner = owner;

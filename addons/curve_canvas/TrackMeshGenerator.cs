@@ -156,7 +156,7 @@ public partial class TrackMeshGenerator : Path3D
             return;
         }
 
-        var owner = GetTree()?.EditedSceneRoot;
+        var owner = GetTree()?.CurrentScene;
         if (owner != null)
         {
             node.Owner = owner;

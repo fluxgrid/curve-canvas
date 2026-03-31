@@ -1,0 +1,6 @@
+[gd_scene format=4 uid="uid://ingameeditorui"]
+
+[ext_resource type="Script" path="res://addons/curve_canvas/InGameEditorUI.cs" id="1"]
+
+[node name="InGameEditorUI" type="CanvasLayer"]
+script = ExtResource("1")

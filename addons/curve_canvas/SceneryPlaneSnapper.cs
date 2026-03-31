@@ -137,7 +137,7 @@ public partial class SceneryPlaneSnapper : Node3D
 
         if (Engine.IsEditorHint())
         {
-            var owner = Owner ?? GetTree()?.EditedSceneRoot;
+            var owner = Owner ?? GetTree()?.CurrentScene;
             if (owner != null)
             {
                 nodeInstance.Owner = owner;

@@ -9,8 +9,7 @@ namespace CurveCanvas.Editor;
 /// <summary>
 /// Imports serialized CurveCanvas payloads back into the active Godot scene.
 /// </summary>
-[Tool]
-public partial class CurveCanvasImporter : EditorScript
+public static class CurveCanvasImporter
 {
     private const string TriggerContainerName = "CameraTriggers";
 
@@ -18,37 +17,6 @@ public partial class CurveCanvasImporter : EditorScript
     {
         PropertyNameCaseInsensitive = true
     };
-
-    public override void _Run()
-    {
-        var editor = EditorInterface.Singleton;
-        var sceneRoot = editor?.GetEditedSceneRoot();
-        if (sceneRoot == null)
-        {
-            GD.PushError("[CurveCanvasImporter] No open scene to import into.");
-            return;
-        }
-
-        var sceneName = CurveCanvasExportCommon.GetSceneName(sceneRoot);
-        var importPath = $"res://Exports/{sceneName}.curvecanvas.json";
-
-        if (!FileAccess.FileExists(importPath))
-        {
-            GD.PushError($"[CurveCanvasImporter] No export found at {importPath}.");
-            return;
-        }
-
-        var data = DeserializeCanvasData(importPath);
-        if (data == null)
-        {
-            GD.PushError("[CurveCanvasImporter] File did not contain CurveCanvas data.");
-            return;
-        }
-
-        ApplySplineData(sceneRoot, data);
-        ReportCameraTriggers(data);
-        GD.Print($"[CurveCanvasImporter] Imported {data.Spline.Count} spline points from {importPath}");
-    }
 
     /// <summary>
     /// Rebuilds camera trigger nodes from a serialized CurveCanvas payload.
@@ -58,7 +26,7 @@ public partial class CurveCanvasImporter : EditorScript
     /// <param name="triggerPrefab">Prefab instantiated for each trigger entry.</param>
     /// <param name="undoRedo">Optional undo stack to wrap trigger placement.</param>
     /// <param name="metadataPanel">Optional level metadata panel to populate after loading.</param>
-    public static void LoadCanvas(string filePath, Node rootNode, PackedScene triggerPrefab, EditorUndoRedoManager? undoRedo = null, LevelMetadataPanel? metadataPanel = null)
+    public static void LoadCanvas(string filePath, Node rootNode, PackedScene triggerPrefab, UndoRedo? undoRedo = null, LevelMetadataPanel? metadataPanel = null)
     {
         if (string.IsNullOrWhiteSpace(filePath))
         {
@@ -142,13 +110,13 @@ public partial class CurveCanvasImporter : EditorScript
             var transform = triggerNode.GlobalTransform;
 
             undoRedo.CreateAction($"Place Camera Trigger ({triggerNode.Name})");
-            undoRedo.AddDoMethod(container, Node.MethodName.AddChild, triggerNode);
+            undoRedo.AddDoMethod(Callable.From(() => container.AddChild(triggerNode)));
             if (owner != null)
             {
-                undoRedo.AddDoMethod(triggerNode, Node.MethodName.SetOwner, owner);
+                undoRedo.AddDoMethod(Callable.From(() => triggerNode.SetOwner(owner)));
             }
-            undoRedo.AddDoMethod(triggerNode, Node3D.MethodName.SetGlobalTransform, transform);
-            undoRedo.AddUndoMethod(container, Node.MethodName.RemoveChild, triggerNode);
+            undoRedo.AddDoMethod(Callable.From(() => triggerNode.SetGlobalTransform(transform)));
+            undoRedo.AddUndoMethod(Callable.From(() => container.RemoveChild(triggerNode)));
             undoRedo.AddUndoReference(triggerNode);
             undoRedo.CommitAction();
         }
@@ -183,47 +151,7 @@ public partial class CurveCanvasImporter : EditorScript
         }
     }
 
-    private static void ApplySplineData(Node sceneRoot, CurveCanvasExportData data)
-    {
-        var track = CurveCanvasExportCommon.FindTrackGenerator(sceneRoot);
-        if (track == null)
-        {
-            track = new TrackMeshGenerator
-            {
-                Name = "TrackGenerator"
-            };
-            sceneRoot.AddChild(track, true);
-            track.Owner = sceneRoot;
-        }
-
-        track.Curve ??= new Curve3D();
-        ClearCurve(track.Curve);
-        foreach (var point in data.Spline)
-        {
-            track.Curve.AddPoint(new Vector3(point.X, point.Y, 0f));
-        }
-    }
-
-    private static void ClearCurve(Curve3D curve)
-    {
-        for (var i = curve.GetPointCount() - 1; i >= 0; i--)
-        {
-            curve.RemovePoint(i);
-        }
-    }
-
-    private static void ReportCameraTriggers(CurveCanvasExportData data)
-    {
-        var triggerCount = data.CameraTriggers?.Count ?? 0;
-        if (triggerCount == 0)
-        {
-            return;
-        }
-
-        GD.Print($"[CurveCanvasImporter] Camera trigger data detected ({triggerCount}). Call LoadCanvas() with a trigger prefab to rebuild them.");
-    }
-
-    private static Node EnsureTriggerContainer(Node rootNode, Node owner)
+    private static Node EnsureTriggerContainer(Node rootNode, Node? owner)
     {
         Node? container = null;
         foreach (Node child in rootNode.GetChildren())
@@ -266,9 +194,9 @@ public partial class CurveCanvasImporter : EditorScript
     private static Node ResolveOwner(Node rootNode)
     {
         var tree = rootNode.GetTree();
-        if (tree?.EditedSceneRoot != null)
+        if (tree?.CurrentScene != null)
         {
-            return tree.EditedSceneRoot;
+            return tree.CurrentScene;
         }
 
         return rootNode.Owner ?? rootNode;

@@ -183,7 +183,7 @@ public partial class ActionObjectSnapper : Node3D
         AddChild(nodeInstance);
         if (Engine.IsEditorHint())
         {
-            var owner = Owner ?? GetTree()?.EditedSceneRoot;
+            var owner = Owner ?? GetTree()?.CurrentScene;
             nodeInstance.Owner = owner;
         }
 

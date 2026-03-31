@@ -91,7 +91,7 @@ public partial class PropBrushTool : RefCounted
         }
     }
 
-    public void EndStroke(EditorUndoRedoManager undoRedo)
+    public void EndStroke(UndoRedo undoRedo)
     {
         if (!_strokeActive)
         {
@@ -140,7 +140,7 @@ public partial class PropBrushTool : RefCounted
         _pendingSamples.Add(offset);
     }
 
-    private void SpawnSamplesWithUndo(EditorUndoRedoManager undoRedo)
+    private void SpawnSamplesWithUndo(UndoRedo undoRedo)
     {
         if (_trackPath == null || _trackPath.Curve == null || _registry == null || _spawnParent == null)
         {
@@ -152,7 +152,7 @@ public partial class PropBrushTool : RefCounted
             return;
         }
 
-        var owner = _spawnParent.Owner ?? _spawnParent.GetTree()?.EditedSceneRoot;
+        var owner = _spawnParent.Owner ?? _spawnParent.GetTree()?.CurrentScene;
         var nodesToSpawn = new List<SceneryPlaneSnapper>(_pendingSamples.Count);
 
         foreach (var offset in _pendingSamples)
@@ -181,13 +181,13 @@ public partial class PropBrushTool : RefCounted
         undoRedo.CreateAction("Prop Brush Stroke");
         foreach (var snapper in nodesToSpawn)
         {
-            undoRedo.AddDoMethod(_spawnParent, Node.MethodName.AddChild, snapper);
+            undoRedo.AddDoMethod(Callable.From(() => _spawnParent.AddChild(snapper)));
             if (owner != null)
             {
-                undoRedo.AddDoMethod(snapper, Node.MethodName.SetOwner, owner);
+                undoRedo.AddDoMethod(Callable.From(() => snapper.SetOwner(owner)));
             }
-            undoRedo.AddUndoMethod(_spawnParent, Node.MethodName.RemoveChild, snapper);
-            undoRedo.AddUndoMethod(snapper, Node.MethodName.QueueFree);
+            undoRedo.AddUndoMethod(Callable.From(() => _spawnParent.RemoveChild(snapper)));
+            undoRedo.AddUndoMethod(Callable.From(() => snapper.QueueFree()));
         }
         undoRedo.CommitAction();
     }
