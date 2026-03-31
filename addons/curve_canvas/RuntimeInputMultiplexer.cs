@@ -645,7 +645,7 @@ public partial class RuntimeInputMultiplexer : Node
             return false;
         }
 
-        Variant indexVariant = Variant.CreateNull();
+        Variant indexVariant = default;
         if (collider.HasMeta("point_index"))
         {
             indexVariant = collider.GetMeta("point_index");
