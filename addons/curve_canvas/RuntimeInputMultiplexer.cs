@@ -1,3 +1,4 @@
+using System;
 using Godot;
 
 namespace CurveCanvas.Editor;
@@ -20,11 +21,24 @@ public partial class RuntimeInputMultiplexer : Node
     [Export]
     public NodePath CurveCanvasPath { get; set; } = new();
 
+    [Export]
+    public NodePath TrackGeneratorPath { get; set; } = new();
+
+    [Export]
+    public NodePath PropContainerPath { get; set; } = new();
+
+    [Export(PropertyHint.Range, "0.25,20,0.25")]
+    public float PropBrushFallbackInterval { get; set; } = 3.0f;
+
     public SandboxState CurrentState => _currentState;
 
     private SandboxState _currentState = SandboxState.Select;
     private RuntimeCamera3D? _runtimeCamera;
     private GodotObject? _curveCanvas;
+    private TrackMeshGenerator? _trackGenerator;
+    private Node? _propContainer;
+    private bool _isPointerDown;
+    private Vector3? _lastPropSpawnPosition;
 
     public override void _Ready()
     {
@@ -33,26 +47,18 @@ public partial class RuntimeInputMultiplexer : Node
 
     public override void _UnhandledInput(InputEvent @event)
     {
-        var pointer = GetPointerEvent(@event);
-        if (pointer == null)
+        switch (@event)
         {
-            return;
+            case InputEventMouseButton mouseButton:
+                HandleMouseButton(mouseButton);
+                break;
+            case InputEventMouseMotion mouseMotion:
+                HandleMouseMotion(mouseMotion);
+                break;
+            case InputEventScreenTouch touchEvent:
+                HandleTouchEvent(touchEvent);
+                break;
         }
-
-        var camera = GetRuntimeCamera();
-        if (camera == null)
-        {
-            return;
-        }
-
-        var hit = camera.GetZZeroIntersection(pointer.Value.Position);
-        if (hit == null)
-        {
-            return;
-        }
-
-        DispatchInteraction(hit.Value);
-        GetViewport()?.SetInputAsHandled();
     }
 
     /// <summary>
@@ -63,18 +69,24 @@ public partial class RuntimeInputMultiplexer : Node
         _currentState = newState;
     }
 
-    private void DispatchInteraction(Vector3 hitPosition)
+    private void DispatchInteraction(Vector3 hitPosition, bool isDrag)
     {
         switch (_currentState)
         {
             case SandboxState.Select:
-                HandleSelect(hitPosition);
+                if (!isDrag)
+                {
+                    HandleSelect(hitPosition);
+                }
                 break;
             case SandboxState.DrawSpline:
-                HandleDrawSpline(hitPosition);
+                if (!isDrag)
+                {
+                    HandleDrawSpline(hitPosition);
+                }
                 break;
             case SandboxState.PropBrush:
-                HandlePropBrush(hitPosition);
+                HandlePropBrush(hitPosition, isDrag);
                 break;
         }
     }
@@ -96,9 +108,23 @@ public partial class RuntimeInputMultiplexer : Node
         GD.Print($"[RuntimeInputMultiplexer] CurveCanvas.AddPoint placeholder at {position}");
     }
 
-    private void HandlePropBrush(Vector3 position)
+    private void HandlePropBrush(Vector3 position, bool isDrag)
     {
-        GD.Print($"[RuntimeInputMultiplexer] PropBrush placeholder at {position}");
+        if (Input.IsKeyPressed(Key.Shift))
+        {
+            ErasePropsNear(position);
+            return;
+        }
+
+        if (isDrag && !ShouldSpawnProp(position))
+        {
+            return;
+        }
+
+        if (TrySpawnProp(position))
+        {
+            _lastPropSpawnPosition = position;
+        }
     }
 
     private RuntimeCamera3D? GetRuntimeCamera()
@@ -142,32 +168,184 @@ public partial class RuntimeInputMultiplexer : Node
         {
             _curveCanvas = GetNodeOrNull(CurveCanvasPath);
         }
+
+        if (!TrackGeneratorPath.IsEmpty)
+        {
+            _trackGenerator = GetNodeOrNull<TrackMeshGenerator>(TrackGeneratorPath);
+        }
+
+        if (!PropContainerPath.IsEmpty)
+        {
+            _propContainer = GetNodeOrNull(PropContainerPath);
+        }
     }
 
-    private static PointerEventData? GetPointerEvent(InputEvent @event)
+    private TrackMeshGenerator? GetTrackGenerator()
     {
-        if (@event is InputEventMouseButton mouseButton)
+        if (_trackGenerator != null && IsInstanceValid(_trackGenerator))
         {
-            if (!mouseButton.Pressed || mouseButton.ButtonIndex != MouseButton.Left)
-            {
-                return null;
-            }
-
-            return new PointerEventData(mouseButton.Position);
+            return _trackGenerator;
         }
 
-        if (@event is InputEventScreenTouch touchEvent)
+        if (!TrackGeneratorPath.IsEmpty)
         {
-            if (!touchEvent.Pressed || touchEvent.Index != 0)
-            {
-                return null;
-            }
-
-            return new PointerEventData(touchEvent.Position);
+            _trackGenerator = GetNodeOrNull<TrackMeshGenerator>(TrackGeneratorPath);
         }
 
-        return null;
+        return _trackGenerator;
     }
 
-    private readonly record struct PointerEventData(Vector2 Position);
+    private Node? GetPropContainer()
+    {
+        if (_propContainer != null && IsInstanceValid(_propContainer))
+        {
+            return _propContainer;
+        }
+
+        if (!PropContainerPath.IsEmpty)
+        {
+            _propContainer = GetNodeOrNull(PropContainerPath);
+        }
+
+        return _propContainer;
+    }
+
+    private float GetSpawnInterval()
+    {
+        var track = GetTrackGenerator();
+        if (track?.PropBrushSampleInterval > 0f)
+        {
+            return track.PropBrushSampleInterval;
+        }
+
+        return Math.Max(0.1f, PropBrushFallbackInterval);
+    }
+
+    private void HandleMouseButton(InputEventMouseButton mouseButton)
+    {
+        if (mouseButton.ButtonIndex != MouseButton.Left)
+        {
+            return;
+        }
+
+        if (mouseButton.Pressed)
+        {
+            _isPointerDown = true;
+            ProcessPointerEvent(mouseButton.Position, isDrag: false);
+        }
+        else
+        {
+            _isPointerDown = false;
+            _lastPropSpawnPosition = null;
+        }
+    }
+
+    private void HandleMouseMotion(InputEventMouseMotion mouseMotion)
+    {
+        if (!_isPointerDown || (mouseMotion.ButtonMask & MouseButtonMask.Left) == 0)
+        {
+            return;
+        }
+
+        ProcessPointerEvent(mouseMotion.Position, isDrag: true);
+    }
+
+    private void HandleTouchEvent(InputEventScreenTouch touchEvent)
+    {
+        if (touchEvent.Index != 0)
+        {
+            return;
+        }
+
+        if (touchEvent.Pressed)
+        {
+            _isPointerDown = true;
+            ProcessPointerEvent(touchEvent.Position, isDrag: false);
+        }
+        else
+        {
+            _isPointerDown = false;
+            _lastPropSpawnPosition = null;
+        }
+    }
+
+    private void ProcessPointerEvent(Vector2 screenPosition, bool isDrag)
+    {
+        var camera = GetRuntimeCamera();
+        if (camera == null)
+        {
+            return;
+        }
+
+        var hit = camera.GetZZeroIntersection(screenPosition);
+        if (hit == null)
+        {
+            return;
+        }
+
+        if (isDrag && _currentState != SandboxState.PropBrush)
+        {
+            return;
+        }
+
+        DispatchInteraction(hit.Value, isDrag);
+        GetViewport()?.SetInputAsHandled();
+    }
+
+    private bool ShouldSpawnProp(Vector3 position)
+    {
+        if (_lastPropSpawnPosition == null)
+        {
+            return true;
+        }
+
+        var distance = position.DistanceTo(_lastPropSpawnPosition.Value);
+        return distance >= GetSpawnInterval();
+    }
+
+    private bool TrySpawnProp(Vector3 position)
+    {
+        var canvas = GetCurveCanvas();
+        if (canvas != null)
+        {
+            if (canvas.HasMethod("SpawnProp"))
+            {
+                canvas.Call("SpawnProp", position);
+                return true;
+            }
+
+            if (canvas.HasMethod("HandlePropBrush"))
+            {
+                canvas.Call("HandlePropBrush", position);
+                return true;
+            }
+        }
+
+        GD.Print($"[RuntimeInputMultiplexer] PropBrush placeholder at {position}");
+        return true;
+    }
+
+    private void ErasePropsNear(Vector3 position)
+    {
+        var container = GetPropContainer();
+        if (container == null)
+        {
+            GD.PushWarning("[RuntimeInputMultiplexer] Prop container not assigned; cannot erase props.");
+            return;
+        }
+
+        const float eraserRadius = 2.0f;
+        foreach (var child in container.GetChildren())
+        {
+            if (child is not Node3D node)
+            {
+                continue;
+            }
+
+            if (node.GlobalPosition.DistanceTo(position) < eraserRadius)
+            {
+                node.QueueFree();
+            }
+        }
+    }
 }
