@@ -12,5 +12,6 @@
     {"id": 22, "name": "Wire the runtime editor nodes into CurveCanvasDemo.tscn and resolve UI layout overlaps."},
     {"id": 23, "name": "Fix Handle Raycasting: Isolate spline handles to a dedicated collision layer and update multiplexer raycast mask."},
     {"id": 24, "name": "Implement Active File tracking (Quick Save) and In-Memory Snapshotting for Play/Edit toggling."},
-    {"id": 25, "name": "Implement Boot-Time Level Loading to decouple scene data from the .tscn file."}
+    {"id": 25, "name": "Implement Boot-Time Level Loading to decouple scene data from the .tscn file."},
+    {"id": 26, "name": "Implement Hybrid Camera Navigation (Mouse middle-click/scroll + Touch two-finger pan/pinch)."}
 ]
