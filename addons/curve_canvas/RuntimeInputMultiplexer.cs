@@ -60,6 +60,11 @@ public partial class RuntimeInputMultiplexer : Node
 
     public override void _UnhandledInput(InputEvent @event)
     {
+        if ((@event is InputEventScreenTouch || @event is InputEventScreenDrag) && CameraConsumingMultiTouch())
+        {
+            return;
+        }
+
         switch (@event)
         {
             case InputEventMouseButton mouseButton:
@@ -173,6 +178,12 @@ public partial class RuntimeInputMultiplexer : Node
         }
 
         return _runtimeCamera;
+    }
+
+    private bool CameraConsumingMultiTouch()
+    {
+        var camera = GetRuntimeCamera();
+        return camera != null && camera.IsMultiTouchGestureActive;
     }
 
     private GodotObject? GetCurveCanvas()
