@@ -18,5 +18,6 @@
     {"id": 28, "name": "Implement Asset Palette UI to allow dynamically switching the active Prop Brush prefab."},
     {"id": 29, "name": "Implement Socket Visualization and 'Attach Segment Preview' tool."},
     {"id": 30, "name": "Implement Bezier Tangent Handles for active curve manipulation."},
-    {"id": 31, "name": "Add Smooth and Sharpen (Linear) tangent controls to the Spline Context Menu."}
+    {"id": 31, "name": "Add Smooth and Sharpen (Linear) tangent controls to the Spline Context Menu."},
+    {"id": 32, "name": "Implement Sequence Authoring Mode with 3D Spatial Visualization."}
 ]
