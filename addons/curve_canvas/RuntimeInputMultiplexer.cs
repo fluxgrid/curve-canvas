@@ -28,6 +28,9 @@ public partial class RuntimeInputMultiplexer : Node
     [Export]
     public NodePath PropContainerPath { get; set; } = new();
 
+    [Export]
+    public NodePath SplineHandlesPath { get; set; } = new();
+
     [Export(PropertyHint.Range, "0.25,20,0.25")]
     public float PropBrushFallbackInterval { get; set; } = 3.0f;
 
@@ -40,6 +43,14 @@ public partial class RuntimeInputMultiplexer : Node
     private const float HandleRayLength = 4096f;
     private const float HandleTapThreshold = 0.01f;
 
+    private enum DraggedHandleType
+    {
+        None,
+        Point,
+        TangentIn,
+        TangentOut
+    }
+
     public SandboxState CurrentState => _currentState;
 
     private SandboxState _currentState = SandboxState.Select;
@@ -47,6 +58,7 @@ public partial class RuntimeInputMultiplexer : Node
     private GodotObject? _curveCanvas;
     private TrackMeshGenerator? _trackGenerator;
     private Node? _propContainer;
+    private RuntimeSplineHandles? _splineHandles;
     private UndoRedo? _undoRedo;
     private bool _isPointerDown;
     private bool _propStrokeActive;
@@ -60,6 +72,9 @@ public partial class RuntimeInputMultiplexer : Node
     private Vector3 _dragStartPosition = Vector3.Zero;
     private Vector3 _dragCurrentPosition = Vector3.Zero;
     private bool _handleDragMoved;
+    private DraggedHandleType _draggedHandleType = DraggedHandleType.None;
+    private Vector3 _tangentStartValue = Vector3.Zero;
+    private int _selectedPointIndex = -1;
     private SplineContextMenu? _splineContextMenu;
     private PackedScene? _activePropPrefab;
 
@@ -113,6 +128,8 @@ public partial class RuntimeInputMultiplexer : Node
         {
             _splineContextMenu.DeletePointRequested -= OnDeletePointRequested;
             _splineContextMenu.InsertPointRequested -= OnInsertPointRequested;
+            _splineContextMenu.SmoothPointRequested -= OnSmoothPointRequested;
+            _splineContextMenu.SharpenPointRequested -= OnSharpenPointRequested;
         }
 
         _splineContextMenu = menu;
@@ -122,6 +139,8 @@ public partial class RuntimeInputMultiplexer : Node
             _splineContextMenu.HideMenu();
             _splineContextMenu.DeletePointRequested += OnDeletePointRequested;
             _splineContextMenu.InsertPointRequested += OnInsertPointRequested;
+            _splineContextMenu.SmoothPointRequested += OnSmoothPointRequested;
+            _splineContextMenu.SharpenPointRequested += OnSharpenPointRequested;
         }
     }
 
@@ -213,6 +232,27 @@ public partial class RuntimeInputMultiplexer : Node
         return _runtimeCamera;
     }
 
+    private RuntimeSplineHandles? GetSplineHandles()
+    {
+        if (_splineHandles != null && IsInstanceValid(_splineHandles))
+        {
+            return _splineHandles;
+        }
+
+        if (!SplineHandlesPath.IsEmpty)
+        {
+            _splineHandles = GetNodeOrNull<RuntimeSplineHandles>(SplineHandlesPath);
+        }
+
+        return _splineHandles;
+    }
+
+    private void UpdateSelectedPoint(int index)
+    {
+        _selectedPointIndex = index;
+        GetSplineHandles()?.SetSelectedPoint(index);
+    }
+
     private bool CameraConsumingMultiTouch()
     {
         var camera = GetRuntimeCamera();
@@ -246,6 +286,11 @@ public partial class RuntimeInputMultiplexer : Node
         if (curve == null || pointIndex < 0 || pointIndex >= curve.GetPointCount())
         {
             return;
+        }
+
+        if (_selectedPointIndex == pointIndex)
+        {
+            UpdateSelectedPoint(-1);
         }
 
         var position = curve.GetPointPosition(pointIndex);
@@ -313,6 +358,80 @@ public partial class RuntimeInputMultiplexer : Node
         _undoRedo.CommitAction();
     }
 
+    private void OnSmoothPointRequested(int pointIndex)
+    {
+        HideSplineContextMenu();
+        var curve = GetTrackGenerator()?.Curve;
+        if (curve == null || pointIndex < 0 || pointIndex >= curve.GetPointCount())
+        {
+            return;
+        }
+
+        var currentPos = curve.GetPointPosition(pointIndex);
+        var pointCount = curve.GetPointCount();
+        var computedIn = new Vector3(-1f, 0f, 0f);
+        var computedOut = new Vector3(1f, 0f, 0f);
+        if (pointIndex > 0)
+        {
+            var prevPos = curve.GetPointPosition(pointIndex - 1);
+            computedIn = (prevPos - currentPos) * 0.25f;
+        }
+
+        if (pointIndex < pointCount - 1)
+        {
+            var nextPos = curve.GetPointPosition(pointIndex + 1);
+            computedOut = (nextPos - currentPos) * 0.25f;
+        }
+
+        var prevIn = curve.GetPointIn(pointIndex);
+        var prevOut = curve.GetPointOut(pointIndex);
+
+        if (_undoRedo == null)
+        {
+            curve.SetPointIn(pointIndex, computedIn);
+            curve.SetPointOut(pointIndex, computedOut);
+            return;
+        }
+
+        var curveRef = curve;
+        var inValue = computedIn;
+        var outValue = computedOut;
+        _undoRedo.CreateAction("Smooth Tangents");
+        _undoRedo.AddDoMethod(Callable.From(() => curveRef.SetPointIn(pointIndex, inValue)));
+        _undoRedo.AddDoMethod(Callable.From(() => curveRef.SetPointOut(pointIndex, outValue)));
+        _undoRedo.AddUndoMethod(Callable.From(() => curveRef.SetPointIn(pointIndex, prevIn)));
+        _undoRedo.AddUndoMethod(Callable.From(() => curveRef.SetPointOut(pointIndex, prevOut)));
+        _undoRedo.CommitAction();
+    }
+
+    private void OnSharpenPointRequested(int pointIndex)
+    {
+        HideSplineContextMenu();
+        var curve = GetTrackGenerator()?.Curve;
+        if (curve == null || pointIndex < 0 || pointIndex >= curve.GetPointCount())
+        {
+            return;
+        }
+
+        var prevIn = curve.GetPointIn(pointIndex);
+        var prevOut = curve.GetPointOut(pointIndex);
+
+        if (_undoRedo == null)
+        {
+            curve.SetPointIn(pointIndex, Vector3.Zero);
+            curve.SetPointOut(pointIndex, Vector3.Zero);
+            return;
+        }
+
+        var curveRef = curve;
+        _undoRedo.CreateAction("Sharpen Tangents");
+        _undoRedo.AddDoMethod(Callable.From(() => curveRef.SetPointIn(pointIndex, Vector3.Zero)));
+        _undoRedo.AddDoMethod(Callable.From(() => curveRef.SetPointOut(pointIndex, Vector3.Zero)));
+        _undoRedo.AddUndoMethod(Callable.From(() => curveRef.SetPointIn(pointIndex, prevIn)));
+        _undoRedo.AddUndoMethod(Callable.From(() => curveRef.SetPointOut(pointIndex, prevOut)));
+        _undoRedo.CommitAction();
+    }
+
     private GodotObject? GetCurveCanvas()
     {
         if (_curveCanvas != null && IsInstanceValid(_curveCanvas))
@@ -349,6 +468,13 @@ public partial class RuntimeInputMultiplexer : Node
         {
             _propContainer = GetNodeOrNull(PropContainerPath);
         }
+
+        if (!SplineHandlesPath.IsEmpty)
+        {
+            _splineHandles = GetNodeOrNull<RuntimeSplineHandles>(SplineHandlesPath);
+        }
+
+        UpdateSelectedPoint(_selectedPointIndex);
     }
 
     private TrackMeshGenerator? GetTrackGenerator()
@@ -507,6 +633,10 @@ public partial class RuntimeInputMultiplexer : Node
         if (!isDrag)
         {
             HideSplineContextMenu();
+            if (_currentState == SandboxState.Select)
+            {
+                UpdateSelectedPoint(-1);
+            }
         }
 
         var hit = camera.GetZZeroIntersection(screenPosition);
@@ -809,6 +939,18 @@ public partial class RuntimeInputMultiplexer : Node
             return false;
         }
 
+        string? tangentType = null;
+        if (collider.HasMeta("tangent_type"))
+        {
+            var tangentVariant = collider.GetMeta("tangent_type");
+            tangentType = tangentVariant.VariantType switch
+            {
+                Variant.Type.String => tangentVariant.AsString(),
+                Variant.Type.StringName => tangentVariant.AsStringName().ToString(),
+                _ => null
+            };
+        }
+
         var index = (int)indexVariant;
         if (index < 0 || index >= curve.GetPointCount())
         {
@@ -816,10 +958,22 @@ public partial class RuntimeInputMultiplexer : Node
         }
 
         _draggedPointIndex = index;
-        _dragStartPosition = curve.GetPointPosition(index);
-        _dragCurrentPosition = _dragStartPosition;
+        UpdateSelectedPoint(index);
         _handleDragMoved = false;
         HideSplineContextMenu();
+
+        if (!string.IsNullOrEmpty(tangentType))
+        {
+            _draggedHandleType = tangentType == "in" ? DraggedHandleType.TangentIn : DraggedHandleType.TangentOut;
+            _tangentStartValue = _draggedHandleType == DraggedHandleType.TangentIn
+                ? curve.GetPointIn(index)
+                : curve.GetPointOut(index);
+            return true;
+        }
+
+        _draggedHandleType = DraggedHandleType.Point;
+        _dragStartPosition = curve.GetPointPosition(index);
+        _dragCurrentPosition = _dragStartPosition;
         return true;
     }
 
@@ -835,6 +989,12 @@ public partial class RuntimeInputMultiplexer : Node
         var curve = track?.Curve;
         if (camera == null || curve == null)
         {
+            return;
+        }
+
+        if (_draggedHandleType == DraggedHandleType.TangentIn || _draggedHandleType == DraggedHandleType.TangentOut)
+        {
+            UpdateTangentHandle(screenPosition);
             return;
         }
 
@@ -854,8 +1014,47 @@ public partial class RuntimeInputMultiplexer : Node
         }
     }
 
+    private void UpdateTangentHandle(Vector2 screenPosition)
+    {
+        var camera = GetRuntimeCamera();
+        var track = GetTrackGenerator();
+        var curve = track?.Curve;
+        if (camera == null || curve == null || _draggedPointIndex < 0)
+        {
+            return;
+        }
+
+        var intersection = camera.GetZZeroIntersection(screenPosition);
+        if (intersection == null)
+        {
+            return;
+        }
+
+        var mainPoint = curve.GetPointPosition(_draggedPointIndex);
+        var relative = intersection.Value - mainPoint;
+        if (_draggedHandleType == DraggedHandleType.TangentIn)
+        {
+            curve.SetPointIn(_draggedPointIndex, relative);
+        }
+        else if (_draggedHandleType == DraggedHandleType.TangentOut)
+        {
+            curve.SetPointOut(_draggedPointIndex, relative);
+        }
+
+        if (!_handleDragMoved && (_tangentStartValue - relative).LengthSquared() > HandleTapThreshold * HandleTapThreshold)
+        {
+            _handleDragMoved = true;
+        }
+    }
+
     private void CommitHandleDrag()
     {
+        if (_draggedHandleType == DraggedHandleType.TangentIn || _draggedHandleType == DraggedHandleType.TangentOut)
+        {
+            CommitTangentHandleDrag();
+            return;
+        }
+
         if (_draggedPointIndex < 0)
         {
             return;
@@ -877,6 +1076,7 @@ public partial class RuntimeInputMultiplexer : Node
         _dragCurrentPosition = Vector3.Zero;
         var wasTap = !_handleDragMoved || (start - end).LengthSquared() <= HandleTapThreshold * HandleTapThreshold;
         _handleDragMoved = false;
+        _draggedHandleType = DraggedHandleType.None;
 
         if (wasTap)
         {
@@ -895,6 +1095,52 @@ public partial class RuntimeInputMultiplexer : Node
         var undoAction = new CurvePointAction(curveRef, index, start);
         _undoRedo.AddDoMethod(new Callable(doAction, nameof(CurvePointAction.Apply)));
         _undoRedo.AddUndoMethod(new Callable(undoAction, nameof(CurvePointAction.Apply)));
+        _undoRedo.AddDoReference(doAction);
+        _undoRedo.AddUndoReference(undoAction);
+        _undoRedo.CommitAction();
+    }
+
+    private void CommitTangentHandleDrag()
+    {
+        var index = _draggedPointIndex;
+        var track = GetTrackGenerator();
+        var curve = track?.Curve;
+        var dragType = _draggedHandleType;
+        _draggedPointIndex = -1;
+        _draggedHandleType = DraggedHandleType.None;
+
+        if (curve == null || index < 0)
+        {
+            _handleDragMoved = false;
+            _tangentStartValue = Vector3.Zero;
+            return;
+        }
+
+        var currentValue = dragType == DraggedHandleType.TangentIn
+            ? curve.GetPointIn(index)
+            : curve.GetPointOut(index);
+        var startValue = _tangentStartValue;
+        _tangentStartValue = Vector3.Zero;
+
+        var moved = _handleDragMoved && (startValue - currentValue).LengthSquared() > HandleTapThreshold * HandleTapThreshold;
+        _handleDragMoved = false;
+
+        if (!moved)
+        {
+            return;
+        }
+
+        if (_undoRedo == null)
+        {
+            return;
+        }
+
+        var isIn = dragType == DraggedHandleType.TangentIn;
+        var doAction = new CurveTangentAction(curve, index, isIn, currentValue);
+        var undoAction = new CurveTangentAction(curve, index, isIn, startValue);
+        _undoRedo.CreateAction(isIn ? "Adjust In Tangent" : "Adjust Out Tangent");
+        _undoRedo.AddDoMethod(new Callable(doAction, nameof(CurveTangentAction.Apply)));
+        _undoRedo.AddUndoMethod(new Callable(undoAction, nameof(CurveTangentAction.Apply)));
         _undoRedo.AddDoReference(doAction);
         _undoRedo.AddUndoReference(undoAction);
         _undoRedo.CommitAction();
@@ -992,6 +1238,39 @@ public partial class RuntimeInputMultiplexer : Node
             }
 
             _curve.SetPointPosition(_index, _position);
+        }
+    }
+
+    private sealed partial class CurveTangentAction : RefCounted
+    {
+        private readonly Curve3D _curve;
+        private readonly int _index;
+        private readonly bool _isIn;
+        private readonly Vector3 _value;
+
+        public CurveTangentAction(Curve3D curve, int index, bool isIn, Vector3 value)
+        {
+            _curve = curve;
+            _index = index;
+            _isIn = isIn;
+            _value = value;
+        }
+
+        public void Apply()
+        {
+            if (!GodotObject.IsInstanceValid(_curve))
+            {
+                return;
+            }
+
+            if (_isIn)
+            {
+                _curve.SetPointIn(_index, _value);
+            }
+            else
+            {
+                _curve.SetPointOut(_index, _value);
+            }
         }
     }
 

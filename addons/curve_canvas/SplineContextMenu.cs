@@ -13,14 +13,24 @@ public partial class SplineContextMenu : PanelContainer
     [Signal]
     public delegate void InsertPointRequestedEventHandler(int pointIndex);
 
+    [Signal]
+    public delegate void SmoothPointRequestedEventHandler(int pointIndex);
+
+    [Signal]
+    public delegate void SharpenPointRequestedEventHandler(int pointIndex);
+
     private Button? _deleteButton;
     private Button? _insertButton;
+    private Button? _smoothButton;
+    private Button? _sharpenButton;
     private int _currentPointIndex = -1;
 
     public override void _Ready()
     {
         _deleteButton = GetNodeOrNull<Button>("VBoxContainer/DeleteButton");
         _insertButton = GetNodeOrNull<Button>("VBoxContainer/InsertButton");
+        _smoothButton = GetNodeOrNull<Button>("VBoxContainer/SmoothButton");
+        _sharpenButton = GetNodeOrNull<Button>("VBoxContainer/SharpenButton");
         if (_deleteButton != null)
         {
             _deleteButton.Pressed += OnDeletePressed;
@@ -29,6 +39,16 @@ public partial class SplineContextMenu : PanelContainer
         if (_insertButton != null)
         {
             _insertButton.Pressed += OnInsertPressed;
+        }
+
+        if (_smoothButton != null)
+        {
+            _smoothButton.Pressed += OnSmoothPressed;
+        }
+
+        if (_sharpenButton != null)
+        {
+            _sharpenButton.Pressed += OnSharpenPressed;
         }
 
         HideMenu();
@@ -66,6 +86,28 @@ public partial class SplineContextMenu : PanelContainer
         }
 
         EmitSignal(SignalName.InsertPointRequested, _currentPointIndex);
+        HideMenu();
+    }
+
+    private void OnSmoothPressed()
+    {
+        if (_currentPointIndex < 0)
+        {
+            return;
+        }
+
+        EmitSignal(SignalName.SmoothPointRequested, _currentPointIndex);
+        HideMenu();
+    }
+
+    private void OnSharpenPressed()
+    {
+        if (_currentPointIndex < 0)
+        {
+            return;
+        }
+
+        EmitSignal(SignalName.SharpenPointRequested, _currentPointIndex);
         HideMenu();
     }
 }

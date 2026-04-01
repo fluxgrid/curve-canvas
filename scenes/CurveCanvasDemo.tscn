@@ -84,6 +84,7 @@ RuntimeCameraPath = NodePath("../ArchitectCamera")
 CurveCanvasPath = NodePath("../TrackGenerator")
 TrackGeneratorPath = NodePath("../TrackGenerator")
 PropContainerPath = NodePath("../PropContainer")
+SplineHandlesPath = NodePath("../TrackGenerator/SplineHandles")
 
 [node name="LevelMetadataPanel" parent="." unique_id=950203562 groups=["CurveCanvasLevelMetadata"] instance=ExtResource("4_jm6xb")]
 offset = Vector2(0, 40)

@@ -14,3 +14,9 @@ text = "Delete Point"
 
 [node name="InsertButton" type="Button" parent="VBoxContainer"]
 text = "Insert Point"
+
+[node name="SmoothButton" type="Button" parent="VBoxContainer"]
+text = "Smooth"
+
+[node name="SharpenButton" type="Button" parent="VBoxContainer"]
+text = "Sharpen"
