@@ -11,6 +11,7 @@ public partial class SequenceEditorPanel : PanelContainer
     private Button? _moveDownButton;
     private Button? _removeButton;
     private FileDialog? _addChunkDialog;
+    private FileDialog? _loadSequenceDialog;
     private FileDialog? _saveSequenceDialog;
     private SequenceVisualizer? _visualizer;
     private CurveSequenceData _sequenceData = new();
@@ -29,11 +30,14 @@ public partial class SequenceEditorPanel : PanelContainer
         _moveUpButton!.Pressed += () => MoveSelectedChunk(-1);
         _moveDownButton!.Pressed += () => MoveSelectedChunk(1);
         GetNode<Button>("VBoxContainer/ActionButtons/SaveButton").Pressed += OnSavePressed;
+        GetNode<Button>("VBoxContainer/ActionButtons/LoadButton").Pressed += OnLoadPressed;
 
         _chunkList!.ItemSelected += _ => UpdateButtonStates();
 
         _addChunkDialog!.FileSelected += path => AddChunk(path);
+        _loadSequenceDialog = GetNodeOrNull<FileDialog>("LoadSequenceDialog");
         _saveSequenceDialog!.FileSelected += path => CurveSequenceSerializer.Save(path, _sequenceData);
+        _loadSequenceDialog!.FileSelected += path => LoadSequence(path);
 
         UpdateButtonStates();
     }
@@ -50,9 +54,19 @@ public partial class SequenceEditorPanel : PanelContainer
         _visualizer?.SetVisualizationEnabled(active);
     }
 
+    public void RebuildVisualization()
+    {
+        RefreshVisualization();
+    }
+
     private void OnAddChunkPressed()
     {
         _addChunkDialog?.PopupCenteredRatio();
+    }
+
+    private void OnLoadPressed()
+    {
+        _loadSequenceDialog?.PopupCenteredRatio();
     }
 
     private void OnRemovePressed()
@@ -95,6 +109,23 @@ public partial class SequenceEditorPanel : PanelContainer
         }
 
         _sequenceData.ChunkPaths.Add(path);
+        RefreshList();
+    }
+
+    private void LoadSequence(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return;
+        }
+
+        var data = CurveSequenceSerializer.Load(path);
+        if (data == null)
+        {
+            return;
+        }
+
+        _sequenceData = data;
         RefreshList();
     }
 

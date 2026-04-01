@@ -41,6 +41,9 @@ theme_override_constants/separation = 8
 [node name="AddChunkButton" type="Button" parent="VBoxContainer/ActionButtons"]
 text = "Add Chunk"
 
+[node name="LoadButton" type="Button" parent="VBoxContainer/ActionButtons"]
+text = "Load Sequence"
+
 [node name="RemoveChunkButton" type="Button" parent="VBoxContainer/ActionButtons"]
 text = "Remove"
 
@@ -51,6 +54,11 @@ text = "Save Sequence"
 access = 1
 file_mode = 0
 filters = PackedStringArray("*.curvecanvas.json ;CurveCanvas Chunk")
+
+[node name="LoadSequenceDialog" type="FileDialog" parent="."]
+access = 1
+file_mode = 0
+filters = PackedStringArray("*.curvesequence.json ;Curve Sequence")
 
 [node name="SaveSequenceDialog" type="FileDialog" parent="."]
 access = 1

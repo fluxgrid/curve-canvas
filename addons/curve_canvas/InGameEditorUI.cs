@@ -15,6 +15,18 @@ public partial class InGameEditorUI : CanvasLayer
 
     public UndoRedo RuntimeUndoRedo { get; } = new();
 
+    [Export]
+    public NodePath SequenceEditorPanelPath { get; set; } = new();
+
+    [Export]
+    public NodePath SequenceVisualizerPath { get; set; } = new();
+
+    [Export]
+    public NodePath PrimaryTrackGeneratorPath { get; set; } = new();
+
+    [Export]
+    public NodePath PrimarySplineHandlesPath { get; set; } = new();
+
     private Control? _uiRoot;
     private HBoxContainer? _toolbar;
     private HBoxContainer? _toolButtonsContainer;
@@ -28,6 +40,10 @@ public partial class InGameEditorUI : CanvasLayer
     private Button? _attachPreviewButton;
     private Button? _clearPreviewButton;
     private Label? _activeFileLabel;
+    private HBoxContainer? _modeButtonsContainer;
+    private ButtonGroup? _modeButtonGroup;
+    private Button? _chunkModeButton;
+    private Button? _sequenceModeButton;
     private FileDialog? _exportDialog;
     private FileDialog? _importDialog;
     private FileDialog? _attachPreviewDialog;
@@ -46,6 +62,11 @@ public partial class InGameEditorUI : CanvasLayer
     private PackedScene? _activePropPrefab;
     private readonly List<Node> _previewAttachments = new();
     private string _activeFilePath = string.Empty;
+    private SequenceEditorPanel? _sequencePanel;
+    private SequenceVisualizer? _sequenceVisualizer;
+    private Node3D? _primaryTrackNode;
+    private Node3D? _primarySplineHandles;
+    private bool _sequenceModeActive;
 
     public override void _Ready()
     {
@@ -54,6 +75,7 @@ public partial class InGameEditorUI : CanvasLayer
         CreateDialogs();
         InitializeContextMenu();
         InitializeAssetPalette();
+        ResolveSequenceComponents();
         if (_pendingPaletteProps != null)
         {
             var pending = _pendingPaletteProps;
@@ -94,7 +116,9 @@ public partial class InGameEditorUI : CanvasLayer
         _sceneRoot = GetSceneRoot();
         _metadataPanel = FindMetadataPanel(_sceneRoot);
         ConfigureMultiplexers(_sceneRoot);
+        ResolvePrimaryTrackNodes();
         ApplyActiveSandboxState();
+        ApplyEditorMode();
     }
 
     private void BuildToolbar()
@@ -124,6 +148,7 @@ public partial class InGameEditorUI : CanvasLayer
         }
 
         EnsureToolButtons();
+        EnsureModeButtons();
         EnsureActionButtons();
     }
 
@@ -711,6 +736,150 @@ public partial class InGameEditorUI : CanvasLayer
         _selectToolButton?.SetPressedNoSignal(_activeSandboxState == RuntimeInputMultiplexer.SandboxState.Select);
         _drawToolButton?.SetPressedNoSignal(_activeSandboxState == RuntimeInputMultiplexer.SandboxState.DrawSpline);
         _propToolButton?.SetPressedNoSignal(_activeSandboxState == RuntimeInputMultiplexer.SandboxState.PropBrush);
+    }
+
+    private void EnsureModeButtons()
+    {
+        _modeButtonsContainer ??= _toolbar?.GetNodeOrNull<HBoxContainer>("ModeButtons");
+        if (_modeButtonsContainer == null)
+        {
+            _modeButtonsContainer = new HBoxContainer
+            {
+                Name = "ModeButtons"
+            };
+            _modeButtonsContainer.AddThemeConstantOverride("separation", 6);
+            _toolbar?.AddChild(_modeButtonsContainer);
+        }
+
+        _modeButtonGroup ??= new ButtonGroup();
+        _chunkModeButton ??= _modeButtonsContainer.GetNodeOrNull<Button>("ChunkModeButton") ?? CreateModeButton("ChunkModeButton", "Chunk Mode");
+        _sequenceModeButton ??= _modeButtonsContainer.GetNodeOrNull<Button>("SequenceModeButton") ?? CreateModeButton("SequenceModeButton", "Sequence Mode");
+
+        ConfigureModeButton(_chunkModeButton, false);
+        ConfigureModeButton(_sequenceModeButton, true);
+        _chunkModeButton?.SetPressedNoSignal(!_sequenceModeActive);
+        _sequenceModeButton?.SetPressedNoSignal(_sequenceModeActive);
+    }
+
+    private Button CreateModeButton(string name, string text)
+    {
+        var button = new Button
+        {
+            Name = name,
+            Text = text,
+            ToggleMode = true,
+            FocusMode = Control.FocusModeEnum.None
+        };
+        _modeButtonsContainer?.AddChild(button);
+        return button;
+    }
+
+    private void ConfigureModeButton(Button? button, bool activateSequenceMode)
+    {
+        if (button == null || _modeButtonGroup == null)
+        {
+            return;
+        }
+
+        button.ButtonGroup = _modeButtonGroup;
+        button.Toggled += pressed =>
+        {
+            if (pressed)
+            {
+                SetEditorMode(activateSequenceMode);
+            }
+        };
+    }
+
+    private void SetEditorMode(bool sequenceMode)
+    {
+        if (_sequenceModeActive == sequenceMode)
+        {
+            return;
+        }
+
+        _sequenceModeActive = sequenceMode;
+        ApplyEditorMode();
+    }
+
+    private void ApplyEditorMode()
+    {
+        if (_sequenceModeActive)
+        {
+            foreach (var multiplexer in _multiplexers)
+            {
+                multiplexer.SetInteractionEnabled(false);
+            }
+
+            if (_primaryTrackNode != null)
+            {
+                _primaryTrackNode.Visible = false;
+            }
+
+            if (_primarySplineHandles != null)
+            {
+                _primarySplineHandles.Visible = false;
+            }
+
+            _sequencePanel?.SetActive(true);
+            _sequencePanel?.RebuildVisualization();
+            _sequenceVisualizer?.SetVisualizationEnabled(true);
+        }
+        else
+        {
+            foreach (var multiplexer in _multiplexers)
+            {
+                multiplexer.SetInteractionEnabled(true);
+            }
+
+            if (_primaryTrackNode != null)
+            {
+                _primaryTrackNode.Visible = true;
+            }
+
+            if (_primarySplineHandles != null)
+            {
+                _primarySplineHandles.Visible = true;
+            }
+
+            _sequencePanel?.SetActive(false);
+            _sequenceVisualizer?.SetVisualizationEnabled(false);
+        }
+
+        _chunkModeButton?.SetPressedNoSignal(!_sequenceModeActive);
+        _sequenceModeButton?.SetPressedNoSignal(_sequenceModeActive);
+    }
+
+    private void ResolveSequenceComponents()
+    {
+        if (SequenceEditorPanelPath != NodePath.Empty)
+        {
+            _sequencePanel = GetNodeOrNull<SequenceEditorPanel>(SequenceEditorPanelPath);
+        }
+
+        if (SequenceVisualizerPath != NodePath.Empty)
+        {
+            _sequenceVisualizer = GetNodeOrNull<SequenceVisualizer>(SequenceVisualizerPath);
+        }
+
+        if (_sequencePanel != null && _sequenceVisualizer != null)
+        {
+            _sequencePanel.ConfigureVisualizer(_sequenceVisualizer);
+            _sequencePanel.SetActive(false);
+        }
+    }
+
+    private void ResolvePrimaryTrackNodes()
+    {
+        if (PrimaryTrackGeneratorPath != NodePath.Empty)
+        {
+            _primaryTrackNode = GetNodeOrNull<Node3D>(PrimaryTrackGeneratorPath);
+        }
+
+        if (PrimarySplineHandlesPath != NodePath.Empty)
+        {
+            _primarySplineHandles = GetNodeOrNull<Node3D>(PrimarySplineHandlesPath);
+        }
     }
 
     private Node3D? CreatePreviewCanvas(Node sceneRoot, out TrackMeshGenerator? previewTrack)

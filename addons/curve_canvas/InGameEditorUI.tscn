@@ -33,6 +33,18 @@ toggle_mode = true
 text = "Prop Brush"
 toggle_mode = true
 
+[node name="ModeButtons" type="HBoxContainer" parent="UiRoot/Toolbar"]
+theme_override_constants/separation = 6
+
+[node name="ChunkModeButton" type="Button" parent="UiRoot/Toolbar/ModeButtons"]
+text = "Chunk Mode"
+toggle_mode = true
+button_pressed = true
+
+[node name="SequenceModeButton" type="Button" parent="UiRoot/Toolbar/ModeButtons"]
+text = "Sequence Mode"
+toggle_mode = true
+
 [node name="SaveButton" type="Button" parent="UiRoot/Toolbar"]
 text = "Save"
 
