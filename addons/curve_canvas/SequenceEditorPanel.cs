@@ -53,12 +53,16 @@ public partial class SequenceEditorPanel : PanelContainer
         if (_loadSequenceDialog != null)
         {
             _loadSequenceDialog.Access = FileDialog.AccessEnum.Userdata;
+            _loadSequenceDialog.FileMode = FileDialog.FileModeEnum.OpenFile;
             _loadSequenceDialog.FileSelected += path => LoadSequence(path);
         }
 
         if (_saveSequenceDialog != null)
         {
             _saveSequenceDialog.Access = FileDialog.AccessEnum.Userdata;
+            _saveSequenceDialog.FileMode = FileDialog.FileModeEnum.SaveFile;
+            _saveSequenceDialog.DialogText = "Save Sequence";
+            _saveSequenceDialog.CurrentFile = "sequence.curvesequence.json";
             _saveSequenceDialog.FileSelected += path => CurveSequenceSerializer.Save(path, _sequenceData);
         }
 
