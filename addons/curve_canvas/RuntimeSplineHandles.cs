@@ -70,7 +70,9 @@ public partial class RuntimeSplineHandles : Node3D
         for (var i = 0; i < pointCount; i++)
         {
             var position = _curve.GetPointPosition(i);
-            CreateHandle(i, position);
+            var isEntrance = i == 0;
+            var isExit = i == pointCount - 1;
+            CreateHandle(i, position, isEntrance, isExit);
         }
     }
 
@@ -82,7 +84,7 @@ public partial class RuntimeSplineHandles : Node3D
         }
     }
 
-    private void CreateHandle(int index, Vector3 position)
+    private void CreateHandle(int index, Vector3 position, bool isEntrance, bool isExit)
     {
         var handleRoot = new Node3D
         {
@@ -120,13 +122,28 @@ public partial class RuntimeSplineHandles : Node3D
                 Height = HandleRadius * 1.6f
             }
         };
-        var material = new StandardMaterial3D
+        var material = CreateHandleMaterial(isEntrance, isExit);
+        mesh.MaterialOverride = material;
+        handleRoot.AddChild(mesh, true);
+    }
+
+    private static StandardMaterial3D CreateHandleMaterial(bool isEntrance, bool isExit)
+    {
+        var color = new Color(0.95f, 0.72f, 0.2f, 0.85f);
+        if (isEntrance)
         {
-            AlbedoColor = new Color(0.95f, 0.72f, 0.2f, 0.85f),
+            color = Colors.Green;
+        }
+        else if (isExit)
+        {
+            color = Colors.Red;
+        }
+
+        return new StandardMaterial3D
+        {
+            AlbedoColor = color,
             Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
             ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded
         };
-        mesh.MaterialOverride = material;
-        handleRoot.AddChild(mesh, true);
     }
 }

@@ -7,7 +7,8 @@ namespace CurveCanvas.Editor;
 [Tool]
 public partial class CurveCanvasPlugin : EditorPlugin
 {
-    private VBoxContainer? _dock;
+    private EditorDock? _dock;
+    private VBoxContainer? _dockContent;
     private LineEdit? _pathField;
     private Label? _statusLabel;
     private Button? _refreshButton;
@@ -21,7 +22,7 @@ public partial class CurveCanvasPlugin : EditorPlugin
         BuildFileDialog();
         if (_dock != null)
         {
-            AddControlToDock(DockSlot.LeftUl, _dock);
+            AddDock(_dock);
         }
         RefreshGameManagerReference();
     }
@@ -30,7 +31,7 @@ public partial class CurveCanvasPlugin : EditorPlugin
     {
         if (_dock != null)
         {
-            RemoveControlFromDocks(_dock);
+            RemoveDock(_dock);
             _dock.QueueFree();
             _dock = null;
         }
@@ -44,38 +45,44 @@ public partial class CurveCanvasPlugin : EditorPlugin
 
     private void BuildDock()
     {
-        _dock = new VBoxContainer
+        _dock = new EditorDock
         {
             Name = "CurveCanvasStartupLevelDock",
+            DefaultSlot = EditorDock.DockSlot.LeftUl
+        };
+
+        _dockContent = new VBoxContainer
+        {
             CustomMinimumSize = new Vector2(260, 0),
             SizeFlagsHorizontal = Control.SizeFlags.ExpandFill
         };
+        _dock.AddChild(_dockContent);
 
         var title = new Label
         {
             Text = "CurveCanvas Startup Level",
             ThemeTypeVariation = "HeaderSmall"
         };
-        _dock.AddChild(title);
+        _dockContent.AddChild(title);
 
         _statusLabel = new Label
         {
             Text = "Looking for CurveCanvasGameManager..."
         };
-        _dock.AddChild(_statusLabel);
+        _dockContent.AddChild(_statusLabel);
 
         _pathField = new LineEdit
         {
             Editable = false,
             PlaceholderText = "No startup level configured"
         };
-        _dock.AddChild(_pathField);
+        _dockContent.AddChild(_pathField);
 
         var buttonRow = new HBoxContainer
         {
             Alignment = BoxContainer.AlignmentMode.Center
         };
-        _dock.AddChild(buttonRow);
+        _dockContent.AddChild(buttonRow);
 
         _refreshButton = new Button
         {

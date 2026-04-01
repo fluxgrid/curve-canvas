@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using CurveCanvas.AuthoringCore;
 using Godot;
@@ -24,9 +25,12 @@ public partial class InGameEditorUI : CanvasLayer
     private Button? _saveButton;
     private Button? _exportButton;
     private Button? _importButton;
+    private Button? _attachPreviewButton;
+    private Button? _clearPreviewButton;
     private Label? _activeFileLabel;
     private FileDialog? _exportDialog;
     private FileDialog? _importDialog;
+    private FileDialog? _attachPreviewDialog;
     private SplineContextMenu? _splineContextMenu;
     private ScrollContainer? _assetPaletteScroll;
     private HBoxContainer? _propPaletteContainer;
@@ -40,6 +44,7 @@ public partial class InGameEditorUI : CanvasLayer
     private RuntimeInputMultiplexer.SandboxState _activeSandboxState = RuntimeInputMultiplexer.SandboxState.Select;
     private readonly HashSet<Button> _configuredToolButtons = new();
     private PackedScene? _activePropPrefab;
+    private readonly List<Node> _previewAttachments = new();
     private string _activeFilePath = string.Empty;
 
     public override void _Ready()
@@ -151,6 +156,20 @@ public partial class InGameEditorUI : CanvasLayer
 
         ConfigureDialog(_exportDialog, OnExportFileSelected);
         ConfigureDialog(_importDialog, OnImportFileSelected);
+
+        _attachPreviewDialog ??= _uiRoot?.GetNodeOrNull<FileDialog>("AttachPreviewDialog");
+        if (_attachPreviewDialog == null)
+        {
+            _attachPreviewDialog = new FileDialog
+            {
+                Name = "CurveCanvasAttachPreviewDialog",
+                FileMode = FileDialog.FileModeEnum.OpenFile,
+                Access = FileDialog.AccessEnum.Userdata
+            };
+            AddChild(_attachPreviewDialog);
+        }
+
+        ConfigureDialog(_attachPreviewDialog, OnAttachPreviewFileSelected);
     }
 
     private void InitializeContextMenu()
@@ -255,6 +274,11 @@ public partial class InGameEditorUI : CanvasLayer
         _exportDialog?.PopupCenteredRatio();
     }
 
+    private void OnAttachPreviewButtonPressed()
+    {
+        _attachPreviewDialog?.PopupCenteredRatio();
+    }
+
     private void OnSaveButtonPressed()
     {
         if (string.IsNullOrWhiteSpace(_activeFilePath))
@@ -269,6 +293,25 @@ public partial class InGameEditorUI : CanvasLayer
     private void OnImportButtonPressed()
     {
         _importDialog?.PopupCenteredRatio();
+    }
+
+    private void OnClearPreviewButtonPressed()
+    {
+        if (_previewAttachments.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var preview in _previewAttachments)
+        {
+            if (preview != null && preview.IsInsideTree())
+            {
+                preview.QueueFree();
+            }
+        }
+
+        _previewAttachments.Clear();
+        UpdatePreviewButtonsState();
     }
 
     private void OnExportFileSelected(string path)
@@ -311,6 +354,51 @@ public partial class InGameEditorUI : CanvasLayer
 
         CurveCanvasImporter.LoadCanvas(path, sceneRoot, _triggerPrefab, RuntimeUndoRedo, _metadataPanel);
         SetActiveFilePath(path);
+    }
+
+    private void OnAttachPreviewFileSelected(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return;
+        }
+
+        var sceneRoot = GetSceneRoot();
+        if (sceneRoot == null)
+        {
+            GD.PushError("[InGameEditorUI] Cannot attach preview; scene root not found.");
+            return;
+        }
+
+        _triggerPrefab ??= GD.Load<PackedScene>(TriggerPrefabPath);
+        if (_triggerPrefab == null)
+        {
+            GD.PushError("[InGameEditorUI] Trigger prefab missing; cannot attach preview.");
+            return;
+        }
+
+        string json;
+        try
+        {
+            json = FileAccess.GetFileAsString(path);
+        }
+        catch (Exception ex)
+        {
+            GD.PushError($"[InGameEditorUI] Failed to read preview file: {ex.Message}");
+            return;
+        }
+
+        var previewRoot = CreatePreviewCanvas(sceneRoot, out var previewTrack);
+        if (previewRoot == null || previewTrack == null)
+        {
+            GD.PushError("[InGameEditorUI] Failed to create preview canvas.");
+            return;
+        }
+
+        CurveCanvasImporter.LoadCanvasFromString(json, previewRoot, _triggerPrefab, null, null, path);
+        AlignPreviewToMainTrack(previewRoot, previewTrack);
+        _previewAttachments.Add(previewRoot);
+        UpdatePreviewButtonsState();
     }
 
     private Node? GetSceneRoot()
@@ -451,6 +539,14 @@ public partial class InGameEditorUI : CanvasLayer
         }
     }
 
+    private void UpdatePreviewButtonsState()
+    {
+        if (_clearPreviewButton != null)
+        {
+            _clearPreviewButton.Disabled = _previewAttachments.Count == 0;
+        }
+    }
+
     private void EnsureToolButtons()
     {
         _toolButtonGroup ??= new ButtonGroup();
@@ -496,6 +592,8 @@ public partial class InGameEditorUI : CanvasLayer
         _saveButton ??= _toolbar?.GetNodeOrNull<Button>("SaveButton");
         _exportButton ??= _toolbar?.GetNodeOrNull<Button>("ExportButton");
         _importButton ??= _toolbar?.GetNodeOrNull<Button>("ImportButton");
+        _attachPreviewButton ??= _toolbar?.GetNodeOrNull<Button>("AttachPreviewButton");
+        _clearPreviewButton ??= _toolbar?.GetNodeOrNull<Button>("ClearPreviewButton");
         _activeFileLabel ??= _toolbar?.GetNodeOrNull<Label>("ActiveFileLabel");
 
         if (_saveButton == null)
@@ -531,6 +629,29 @@ public partial class InGameEditorUI : CanvasLayer
             _toolbar?.AddChild(_importButton);
         }
 
+        if (_attachPreviewButton == null)
+        {
+            _attachPreviewButton = new Button
+            {
+                Name = "AttachPreviewButton",
+                Text = "Attach Preview",
+                FocusMode = Control.FocusModeEnum.None
+            };
+            _toolbar?.AddChild(_attachPreviewButton);
+        }
+
+        if (_clearPreviewButton == null)
+        {
+            _clearPreviewButton = new Button
+            {
+                Name = "ClearPreviewButton",
+                Text = "Clear Previews",
+                FocusMode = Control.FocusModeEnum.None,
+                Disabled = true
+            };
+            _toolbar?.AddChild(_clearPreviewButton);
+        }
+
         if (_activeFileLabel == null)
         {
             _activeFileLabel = new Label
@@ -547,7 +668,12 @@ public partial class InGameEditorUI : CanvasLayer
         _exportButton.Pressed += OnExportButtonPressed;
         _importButton.Pressed -= OnImportButtonPressed;
         _importButton.Pressed += OnImportButtonPressed;
+        _attachPreviewButton.Pressed -= OnAttachPreviewButtonPressed;
+        _attachPreviewButton.Pressed += OnAttachPreviewButtonPressed;
+        _clearPreviewButton.Pressed -= OnClearPreviewButtonPressed;
+        _clearPreviewButton.Pressed += OnClearPreviewButtonPressed;
         UpdateActiveFileLabel();
+        UpdatePreviewButtonsState();
     }
 
     private static void ConfigureDialog(FileDialog? dialog, FileDialog.FileSelectedEventHandler handler)
@@ -585,5 +711,47 @@ public partial class InGameEditorUI : CanvasLayer
         _selectToolButton?.SetPressedNoSignal(_activeSandboxState == RuntimeInputMultiplexer.SandboxState.Select);
         _drawToolButton?.SetPressedNoSignal(_activeSandboxState == RuntimeInputMultiplexer.SandboxState.DrawSpline);
         _propToolButton?.SetPressedNoSignal(_activeSandboxState == RuntimeInputMultiplexer.SandboxState.PropBrush);
+    }
+
+    private Node3D? CreatePreviewCanvas(Node sceneRoot, out TrackMeshGenerator? previewTrack)
+    {
+        previewTrack = null;
+        var previewRoot = new Node3D
+        {
+            Name = $"AttachmentPreview_{_previewAttachments.Count:D2}"
+        };
+
+        sceneRoot.AddChild(previewRoot);
+
+        var track = new TrackMeshGenerator
+        {
+            Name = "TrackGeneratorPreview"
+        };
+        track.Curve ??= new Curve3D();
+        previewRoot.AddChild(track);
+
+        var propContainer = new Node3D
+        {
+            Name = "PropContainer"
+        };
+        previewRoot.AddChild(propContainer);
+
+        previewTrack = track;
+        return previewRoot;
+    }
+
+    private void AlignPreviewToMainTrack(Node3D previewRoot, TrackMeshGenerator previewTrack)
+    {
+        var sceneRoot = GetSceneRoot();
+        var mainTrack = sceneRoot != null ? CurveCanvasExportCommon.FindTrackGenerator(sceneRoot) : null;
+        if (mainTrack?.Curve == null || previewTrack.Curve == null)
+        {
+            return;
+        }
+
+        var alignment = SegmentStitcher.CalculateSocketAlignment(mainTrack.Curve, previewTrack.Curve);
+        var transform = previewRoot.GlobalTransform;
+        transform.Origin += alignment.Origin;
+        previewRoot.GlobalTransform = transform;
     }
 }

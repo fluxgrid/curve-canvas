@@ -42,6 +42,13 @@ text = "Export Canvas"
 [node name="ImportButton" type="Button" parent="UiRoot/Toolbar"]
 text = "Import Canvas"
 
+[node name="AttachPreviewButton" type="Button" parent="UiRoot/Toolbar"]
+text = "Attach Preview"
+
+[node name="ClearPreviewButton" type="Button" parent="UiRoot/Toolbar"]
+text = "Clear Previews"
+disabled = true
+
 [node name="ActiveFileLabel" type="Label" parent="UiRoot/Toolbar"]
 text = "Editing: Unsaved Scene"
 
@@ -53,6 +60,13 @@ file_mode = 3
 filters = PackedStringArray("*.curvecanvas.json ;CurveCanvas Level")
 
 [node name="ImportDialog" type="FileDialog" parent="UiRoot"]
+visible = false
+size = Vector2i(800, 520)
+access = 1
+file_mode = 0
+filters = PackedStringArray("*.curvecanvas.json ;CurveCanvas Level")
+
+[node name="AttachPreviewDialog" type="FileDialog" parent="UiRoot"]
 visible = false
 size = Vector2i(800, 520)
 access = 1
