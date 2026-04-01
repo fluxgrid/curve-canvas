@@ -852,12 +852,12 @@ public partial class InGameEditorUI : CanvasLayer
 
     private void ResolveSequenceComponents()
     {
-        if (SequenceEditorPanelPath != NodePath.Empty)
+        if (HasNodePath(SequenceEditorPanelPath))
         {
             _sequencePanel = GetNodeOrNull<SequenceEditorPanel>(SequenceEditorPanelPath);
         }
 
-        if (SequenceVisualizerPath != NodePath.Empty)
+        if (HasNodePath(SequenceVisualizerPath))
         {
             _sequenceVisualizer = GetNodeOrNull<SequenceVisualizer>(SequenceVisualizerPath);
         }
@@ -871,15 +871,20 @@ public partial class InGameEditorUI : CanvasLayer
 
     private void ResolvePrimaryTrackNodes()
     {
-        if (PrimaryTrackGeneratorPath != NodePath.Empty)
+        if (HasNodePath(PrimaryTrackGeneratorPath))
         {
             _primaryTrackNode = GetNodeOrNull<Node3D>(PrimaryTrackGeneratorPath);
         }
 
-        if (PrimarySplineHandlesPath != NodePath.Empty)
+        if (HasNodePath(PrimarySplineHandlesPath))
         {
             _primarySplineHandles = GetNodeOrNull<Node3D>(PrimarySplineHandlesPath);
         }
+    }
+
+    private static bool HasNodePath(NodePath path)
+    {
+        return !string.IsNullOrEmpty(path.ToString());
     }
 
     private Node3D? CreatePreviewCanvas(Node sceneRoot, out TrackMeshGenerator? previewTrack)

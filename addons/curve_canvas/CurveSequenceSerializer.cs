@@ -40,7 +40,7 @@ public static class CurveSequenceSerializer
             };
 
             var json = JsonSerializer.Serialize(model, JsonOptions);
-            using var file = FileAccess.Open(filePath, FileAccess.ModeFlags.Write);
+            using var file = Godot.FileAccess.Open(filePath, Godot.FileAccess.ModeFlags.Write);
             file.StoreString(json);
             GD.Print($"[CurveSequenceSerializer] Saved sequence to {filePath}");
             return true;
@@ -62,7 +62,7 @@ public static class CurveSequenceSerializer
 
         try
         {
-            var json = FileAccess.GetFileAsString(filePath);
+            var json = Godot.FileAccess.GetFileAsString(filePath);
             var model = JsonSerializer.Deserialize<CurveSequenceFileModel>(json, JsonOptions);
             if (model == null)
             {
