@@ -7,10 +7,13 @@ namespace CurveCanvas.Editor;
 
 public partial class SequenceEditorPanel : PanelContainer
 {
+    public event Action? CloseRequested;
+
     private ItemList? _chunkList;
     private Button? _moveUpButton;
     private Button? _moveDownButton;
     private Button? _removeButton;
+    private Button? _closeButton;
     private FileDialog? _addChunkDialog;
     private FileDialog? _loadSequenceDialog;
     private FileDialog? _saveSequenceDialog;
@@ -32,6 +35,11 @@ public partial class SequenceEditorPanel : PanelContainer
         _moveDownButton!.Pressed += () => MoveSelectedChunk(1);
         GetNode<Button>("VBoxContainer/ActionButtons/SaveButton").Pressed += OnSavePressed;
         GetNode<Button>("VBoxContainer/ActionButtons/LoadButton").Pressed += OnLoadPressed;
+        _closeButton = GetNodeOrNull<Button>("VBoxContainer/Header/CloseButton");
+        if (_closeButton != null)
+        {
+            _closeButton.Pressed += OnClosePressed;
+        }
 
         _chunkList!.ItemSelected += _ => UpdateButtonStates();
 
@@ -82,6 +90,11 @@ public partial class SequenceEditorPanel : PanelContainer
     private void OnLoadPressed()
     {
         _loadSequenceDialog?.PopupCenteredRatio();
+    }
+
+    private void OnClosePressed()
+    {
+        CloseRequested?.Invoke();
     }
 
     private void OnRemovePressed()

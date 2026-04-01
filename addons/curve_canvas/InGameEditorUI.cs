@@ -866,6 +866,8 @@ public partial class InGameEditorUI : CanvasLayer
         {
             _sequencePanel.ConfigureVisualizer(_sequenceVisualizer);
             _sequencePanel.SetActive(false);
+            _sequencePanel.CloseRequested -= OnSequencePanelCloseRequested;
+            _sequencePanel.CloseRequested += OnSequencePanelCloseRequested;
         }
     }
 
@@ -885,6 +887,11 @@ public partial class InGameEditorUI : CanvasLayer
     private static bool HasNodePath(NodePath path)
     {
         return !string.IsNullOrEmpty(path.ToString());
+    }
+
+    private void OnSequencePanelCloseRequested()
+    {
+        SetEditorMode(false);
     }
 
     private Node3D? CreatePreviewCanvas(Node sceneRoot, out TrackMeshGenerator? previewTrack)
