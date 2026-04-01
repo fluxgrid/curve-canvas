@@ -15,7 +15,15 @@ public sealed class CurveCanvasExportData
     public List<CameraTriggerData> CameraTriggers { get; set; } = new();
 }
 
-public record struct CurveCanvasSplinePoint(float X, float Y);
+public sealed class CurveCanvasSplinePoint
+{
+    public float X { get; set; }
+    public float Y { get; set; }
+    public float InX { get; set; }
+    public float InY { get; set; }
+    public float OutX { get; set; }
+    public float OutY { get; set; }
+}
 
 public record struct CurveCanvasActionObject(string ObjectId, float CurveOffset);
 

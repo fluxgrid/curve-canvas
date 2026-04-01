@@ -129,7 +129,17 @@ public static class CurveCanvasExporter
         {
             var position = curve.GetPointPosition(i);
             position.Z = 0f;
-            results.Add(new CurveCanvasSplinePoint(position.X, position.Y));
+            var inVec = curve.GetPointIn(i);
+            var outVec = curve.GetPointOut(i);
+            results.Add(new CurveCanvasSplinePoint
+            {
+                X = position.X,
+                Y = position.Y,
+                InX = inVec.X,
+                InY = inVec.Y,
+                OutX = outVec.X,
+                OutY = outVec.Y
+            });
         }
 
         return results;

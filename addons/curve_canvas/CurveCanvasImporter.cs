@@ -167,7 +167,9 @@ public static class CurveCanvasImporter
         foreach (var point in splinePoints)
         {
             var position = new Vector3(point.X, point.Y, 0f);
-            curve.AddPoint(position);
+            var inVec = new Vector3(point.InX, point.InY, 0f);
+            var outVec = new Vector3(point.OutX, point.OutY, 0f);
+            curve.AddPoint(position, inVec, outVec);
         }
     }
 
