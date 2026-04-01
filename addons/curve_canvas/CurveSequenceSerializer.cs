@@ -39,8 +39,19 @@ public static class CurveSequenceSerializer
                 ChunkPaths = data.ChunkPaths?.ToList() ?? new List<string>()
             };
 
+            if (!EnsureDirectoryExists(filePath))
+            {
+                return false;
+            }
+
             var json = JsonSerializer.Serialize(model, JsonOptions);
             using var file = Godot.FileAccess.Open(filePath, Godot.FileAccess.ModeFlags.Write);
+            if (file == null)
+            {
+                GD.PushError($"[CurveSequenceSerializer] Failed to open '{filePath}' for writing: {Godot.FileAccess.GetOpenError()}");
+                return false;
+            }
+
             file.StoreString(json);
             GD.Print($"[CurveSequenceSerializer] Saved sequence to {filePath}");
             return true;
@@ -79,5 +90,23 @@ public static class CurveSequenceSerializer
             GD.PushError($"[CurveSequenceSerializer] Failed to read '{filePath}': {ex.Message}");
             return null;
         }
+    }
+    private static bool EnsureDirectoryExists(string filePath)
+    {
+        var globalPath = ProjectSettings.GlobalizePath(filePath);
+        var directory = Path.GetDirectoryName(globalPath);
+        if (string.IsNullOrEmpty(directory))
+        {
+            return true;
+        }
+
+        var error = DirAccess.MakeDirRecursiveAbsolute(directory);
+        if (error != Error.Ok && error != Error.AlreadyExists)
+        {
+            GD.PushError($"[CurveSequenceSerializer] Failed to create directory '{directory}': {error}");
+            return false;
+        }
+
+        return true;
     }
 }
