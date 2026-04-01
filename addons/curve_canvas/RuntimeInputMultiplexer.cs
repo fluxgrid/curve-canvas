@@ -729,8 +729,12 @@ public partial class RuntimeInputMultiplexer : Node
 
         var curveRef = curve;
         _undoRedo.CreateAction("Move Track Point");
-        _undoRedo.AddDoMethod(Callable.From(() => curveRef.SetPointPosition(index, end)));
-        _undoRedo.AddUndoMethod(Callable.From(() => curveRef.SetPointPosition(index, start)));
+        var doAction = new CurvePointAction(curveRef, index, end);
+        var undoAction = new CurvePointAction(curveRef, index, start);
+        _undoRedo.AddDoMethod(new Callable(doAction, nameof(CurvePointAction.Apply)));
+        _undoRedo.AddUndoMethod(new Callable(undoAction, nameof(CurvePointAction.Apply)));
+        _undoRedo.AddDoReference(doAction);
+        _undoRedo.AddUndoReference(undoAction);
         _undoRedo.CommitAction();
     }
 
@@ -783,5 +787,29 @@ public partial class RuntimeInputMultiplexer : Node
         var offset = CurveCanvasMath.GetClosestOffset(curve, position, out _);
         var snapped = curve.SampleBaked(offset);
         return new Vector3(position.X, snapped.Y, track.PropBrushDepthZ);
+    }
+
+    private sealed partial class CurvePointAction : RefCounted
+    {
+        private readonly Curve3D _curve;
+        private readonly int _index;
+        private readonly Vector3 _position;
+
+        public CurvePointAction(Curve3D curve, int index, Vector3 position)
+        {
+            _curve = curve;
+            _index = index;
+            _position = position;
+        }
+
+        public void Apply()
+        {
+            if (!GodotObject.IsInstanceValid(_curve))
+            {
+                return;
+            }
+
+            _curve.SetPointPosition(_index, _position);
+        }
     }
 }

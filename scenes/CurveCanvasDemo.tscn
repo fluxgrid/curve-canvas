@@ -1,14 +1,14 @@
-[gd_scene format=4 uid="uid://daoh7kcq88mui"]
+[gd_scene format=3 uid="uid://daoh7kcq88mui"]
 
 [ext_resource type="Script" uid="uid://dl22bot6fb7ky" path="res://addons/curve_canvas/TrackMeshGenerator.cs" id="1_xryju"]
 [ext_resource type="Script" uid="uid://dscq3txfdcnmu" path="res://addons/curve_canvas/CurveCanvasRegistry.cs" id="2_g248d"]
 [ext_resource type="Script" uid="uid://cflown0wx0sco" path="res://addons/curve_canvas/CurveCanvasStateManager.cs" id="3_5qc33"]
 [ext_resource type="PackedScene" uid="uid://l4vqhfivlnn3" path="res://addons/curve_canvas/LevelMetadataPanel.tscn" id="4_jm6xb"]
-[ext_resource type="PackedScene" path="res://addons/curve_canvas/InGameEditorUI.tscn" id="5_cbfy8"]
-[ext_resource type="Script" path="res://addons/curve_canvas/RuntimeSplineHandles.cs" id="6_n9p2u"]
-[ext_resource type="Script" path="res://addons/curve_canvas/RuntimeInputMultiplexer.cs" id="7_yqv1w"]
-[ext_resource type="Script" path="res://addons/curve_canvas/RuntimeCamera3D.cs" id="8_qa8tp"]
-[ext_resource type="Script" path="res://addons/curve_canvas/CurveCanvasGameManager.cs" id="9_g27ju"]
+[ext_resource type="PackedScene" uid="uid://dbh3b884lwvjo" path="res://addons/curve_canvas/InGameEditorUI.tscn" id="5_cbfy8"]
+[ext_resource type="Script" uid="uid://bmey800w4mahx" path="res://addons/curve_canvas/RuntimeSplineHandles.cs" id="6_n9p2u"]
+[ext_resource type="Script" uid="uid://cvrxgdqfil2db" path="res://addons/curve_canvas/RuntimeInputMultiplexer.cs" id="7_yqv1w"]
+[ext_resource type="Script" uid="uid://cmf0c666qh6b2" path="res://addons/curve_canvas/RuntimeCamera3D.cs" id="8_qa8tp"]
+[ext_resource type="Script" uid="uid://c1riyl551ss1e" path="res://addons/curve_canvas/CurveCanvasGameManager.cs" id="9_g27ju"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_81nbn"]
 sky_horizon_color = Color(0.66224277, 0.6717428, 0.6867428, 1)
@@ -25,19 +25,12 @@ glow_enabled = true
 
 [sub_resource type="Curve3D" id="Curve3D_1"]
 bake_interval = 0.5
-_data = {
-"points": PackedVector3Array(),
-"tilts": PackedFloat32Array()
-}
-point_count = 0
 
-[sub_resource type="CSharpScript" id="CSharpScript_avsly"]
+[sub_resource type="CSharpScript" id="CSharpScript_rww7u"]
 
 [sub_resource type="Resource" id="Resource_1vhvs"]
 script = ExtResource("2_g248d")
 metadata/_custom_type_script = "uid://dscq3txfdcnmu"
-
-
 
 [node name="CurveCanvasDemo" type="Node3D" unique_id=343262453]
 
@@ -54,7 +47,6 @@ script = ExtResource("1_xryju")
 PropBrushRegistry = SubResource("Resource_1vhvs")
 
 [node name="TrackMesh" type="MeshInstance3D" parent="TrackGenerator" unique_id=20361991]
-mesh = null
 
 [node name="CSGSphere3D" type="CSGSphere3D" parent="TrackGenerator" unique_id=1250161297]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.513153, 2.1610832, 0)
@@ -63,16 +55,14 @@ radius = 1.0
 [node name="TrackCollider" type="StaticBody3D" parent="TrackGenerator" unique_id=1723780613]
 
 [node name="TrackCollisionShape" type="CollisionShape3D" parent="TrackGenerator/TrackCollider" unique_id=1617310338]
-shape = null
 
-[node name="SplineHandles" type="Node3D" parent="TrackGenerator"]
+[node name="SplineHandles" type="Node3D" parent="TrackGenerator" unique_id=2052564773]
 script = ExtResource("6_n9p2u")
-PathNode = NodePath("..")
 
 [node name="ArchitectCamera" type="Camera3D" parent="." unique_id=195963348]
-script = ExtResource("8_qa8tp")
 transform = Transform3D(1, 0, 0, 0, 0.8251134, 0.5649669, 0, -0.5649669, 0.8251134, 14.325111, 14.123021, 20)
 current = true
+script = ExtResource("8_qa8tp")
 
 [node name="TestKCC" type="CharacterBody3D" parent="." unique_id=1769408962]
 
@@ -86,9 +76,9 @@ script = ExtResource("3_5qc33")
 
 [node name="SetPieceTrigger" type="Area3D" parent="." unique_id=1183745527]
 
-[node name="PropContainer" type="Node3D" parent="."]
+[node name="PropContainer" type="Node3D" parent="." unique_id=2139299911]
 
-[node name="RuntimeInputMultiplexer" type="Node" parent="."]
+[node name="RuntimeInputMultiplexer" type="Node" parent="." unique_id=1318396009]
 script = ExtResource("7_yqv1w")
 RuntimeCameraPath = NodePath("../ArchitectCamera")
 CurveCanvasPath = NodePath("../TrackGenerator")
@@ -101,8 +91,6 @@ transform = Transform2D(1, 0, 0, 1, 0, 40)
 
 [node name="InGameEditorUI" parent="." unique_id=1382914013 instance=ExtResource("5_cbfy8")]
 
-[node name="GameManager" type="Node" parent="."]
+[node name="GameManager" type="Node" parent="." unique_id=1538066348]
 script = ExtResource("9_g27ju")
 StateManagerPath = NodePath("../StateManager")
-SceneRootPath = NodePath("..")
-MetadataPanelPath = NodePath("../LevelMetadataPanel")
