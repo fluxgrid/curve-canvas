@@ -31,6 +31,12 @@ public partial class RuntimeInputMultiplexer : Node
     [Export(PropertyHint.Range, "0.25,20,0.25")]
     public float PropBrushFallbackInterval { get; set; } = 3.0f;
 
+    public PackedScene? ActivePropPrefab
+    {
+        get => _activePropPrefab;
+        set => _activePropPrefab = value;
+    }
+
     private const float HandleRayLength = 4096f;
     private const float HandleTapThreshold = 0.01f;
 
@@ -55,6 +61,7 @@ public partial class RuntimeInputMultiplexer : Node
     private Vector3 _dragCurrentPosition = Vector3.Zero;
     private bool _handleDragMoved;
     private SplineContextMenu? _splineContextMenu;
+    private PackedScene? _activePropPrefab;
 
     public override void _Ready()
     {
@@ -896,6 +903,26 @@ public partial class RuntimeInputMultiplexer : Node
     private Node3D? CreatePropNode(Vector3 planarPosition)
     {
         var track = GetTrackGenerator();
+        if (_activePropPrefab != null)
+        {
+            if (_activePropPrefab.Instantiate() is not Node3D propInstance)
+            {
+                GD.PushWarning("[RuntimeInputMultiplexer] Active prop prefab must inherit Node3D.");
+                return null;
+            }
+
+            if (track != null)
+            {
+                propInstance.Position = ProjectBrushPosition(planarPosition, track);
+            }
+            else
+            {
+                propInstance.Position = planarPosition;
+            }
+
+            return propInstance;
+        }
+
         if (track?.Curve == null)
         {
             GD.PushWarning("[RuntimeInputMultiplexer] Track generator or curve missing; cannot paint props.");

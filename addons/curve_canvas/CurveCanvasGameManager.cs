@@ -34,6 +34,9 @@ public partial class CurveCanvasGameManager : Node
     [Export(PropertyHint.GlobalFile, "*.curvecanvas.json")]
     public string StartupLevelPath { get; set; } = "user://default_level.curvecanvas.json";
 
+    [Export]
+    public Godot.Collections.Array<PackedScene> AvailableProps { get; set; } = new();
+
     private CurveCanvasStateManager? _stateManager;
     private Node? _sceneRoot;
     private LevelMetadataPanel? _metadataPanel;
@@ -52,6 +55,7 @@ public partial class CurveCanvasGameManager : Node
         _trackGenerator = ResolveTrackGenerator();
         _triggerPrefab = ResourceLoader.Load<PackedScene>(TriggerPrefabPath);
         InitializeStartupLevel();
+        _editorUI?.PopulateAssetPalette(AvailableProps);
 
         if (_stateManager != null)
         {

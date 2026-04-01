@@ -28,12 +28,18 @@ public partial class InGameEditorUI : CanvasLayer
     private FileDialog? _exportDialog;
     private FileDialog? _importDialog;
     private SplineContextMenu? _splineContextMenu;
+    private ScrollContainer? _assetPaletteScroll;
+    private HBoxContainer? _propPaletteContainer;
+    private ButtonGroup? _propPaletteButtonGroup;
+    private readonly List<Button> _propPaletteButtons = new();
+    private Godot.Collections.Array<PackedScene>? _pendingPaletteProps;
     private LevelMetadataPanel? _metadataPanel;
     private PackedScene? _triggerPrefab;
     private Node? _sceneRoot;
     private readonly List<RuntimeInputMultiplexer> _multiplexers = new();
     private RuntimeInputMultiplexer.SandboxState _activeSandboxState = RuntimeInputMultiplexer.SandboxState.Select;
     private readonly HashSet<Button> _configuredToolButtons = new();
+    private PackedScene? _activePropPrefab;
     private string _activeFilePath = string.Empty;
 
     public override void _Ready()
@@ -42,6 +48,13 @@ public partial class InGameEditorUI : CanvasLayer
         BuildToolbar();
         CreateDialogs();
         InitializeContextMenu();
+        InitializeAssetPalette();
+        if (_pendingPaletteProps != null)
+        {
+            var pending = _pendingPaletteProps;
+            _pendingPaletteProps = null;
+            PopulateAssetPalette(pending);
+        }
         CallDeferred(nameof(InitializeAfterSceneReady));
         UpdateActiveFileLabel();
     }
@@ -146,6 +159,97 @@ public partial class InGameEditorUI : CanvasLayer
         _splineContextMenu?.HideMenu();
     }
 
+    private void InitializeAssetPalette()
+    {
+        _uiRoot ??= GetNodeOrNull<Control>("UiRoot");
+        _assetPaletteScroll ??= _uiRoot?.GetNodeOrNull<ScrollContainer>("AssetPalette");
+        _propPaletteContainer ??= _assetPaletteScroll?.GetNodeOrNull<HBoxContainer>("PropPaletteContainer");
+    }
+
+    public void PopulateAssetPalette(Godot.Collections.Array<PackedScene> props)
+    {
+        InitializeAssetPalette();
+        if (_propPaletteContainer == null)
+        {
+            _pendingPaletteProps = props;
+            return;
+        }
+
+        foreach (var existing in _propPaletteButtons)
+        {
+            existing.QueueFree();
+        }
+
+        _propPaletteButtons.Clear();
+        _propPaletteButtonGroup = new ButtonGroup();
+        _activePropPrefab = null;
+
+        if (props == null || props.Count == 0)
+        {
+            SetActivePropBrush(null);
+            return;
+        }
+
+        var defaultAssigned = false;
+        foreach (var prop in props)
+        {
+            if (prop == null)
+            {
+                continue;
+            }
+
+            var button = new Button
+            {
+                Text = GetPropDisplayName(prop),
+                ToggleMode = true,
+                ButtonGroup = _propPaletteButtonGroup,
+                FocusMode = Control.FocusModeEnum.None
+            };
+
+            var capturedProp = prop;
+            button.Toggled += pressed =>
+            {
+                if (pressed)
+                {
+                    OnPropPaletteButtonSelected(button, capturedProp);
+                }
+            };
+
+            _propPaletteContainer.AddChild(button);
+            _propPaletteButtons.Add(button);
+
+            if (!defaultAssigned)
+            {
+                button.SetPressedNoSignal(true);
+                OnPropPaletteButtonSelected(button, capturedProp);
+                defaultAssigned = true;
+            }
+        }
+
+        if (!defaultAssigned)
+        {
+            SetActivePropBrush(null);
+        }
+    }
+
+    private void OnPropPaletteButtonSelected(Button button, PackedScene prop)
+    {
+        _ = button;
+        SetActivePropBrush(prop);
+        SetActiveSandboxState(RuntimeInputMultiplexer.SandboxState.PropBrush);
+    }
+
+    private static string GetPropDisplayName(PackedScene prop)
+    {
+        var resourcePath = prop.ResourcePath;
+        if (string.IsNullOrEmpty(resourcePath))
+        {
+            return string.IsNullOrEmpty(prop.ResourceName) ? "Prop" : prop.ResourceName;
+        }
+
+        return IOPath.GetFileNameWithoutExtension(resourcePath);
+    }
+
     private void OnExportButtonPressed()
     {
         _exportDialog?.PopupCenteredRatio();
@@ -239,6 +343,7 @@ public partial class InGameEditorUI : CanvasLayer
             multiplexer.ConfigureUndoRedo(RuntimeUndoRedo);
             multiplexer.SetSandboxState(_activeSandboxState);
             multiplexer.ConfigureSplineContextMenu(_splineContextMenu);
+            multiplexer.ActivePropPrefab = _activePropPrefab;
         }
     }
 
@@ -335,6 +440,15 @@ public partial class InGameEditorUI : CanvasLayer
             ? "Unsaved Scene"
             : IOPath.GetFileName(_activeFilePath);
         _activeFileLabel.Text = $"Editing: {displayName}";
+    }
+
+    private void SetActivePropBrush(PackedScene? prefab)
+    {
+        _activePropPrefab = prefab;
+        foreach (var multiplexer in _multiplexers)
+        {
+            multiplexer.ActivePropPrefab = prefab;
+        }
     }
 
     private void EnsureToolButtons()
