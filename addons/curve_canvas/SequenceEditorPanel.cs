@@ -45,7 +45,7 @@ public partial class SequenceEditorPanel : PanelContainer
 
         if (_addChunkDialog != null)
         {
-            _addChunkDialog.Access = FileDialog.AccessEnum.Resources;
+            _addChunkDialog.Access = FileDialog.AccessEnum.Userdata;
             _addChunkDialog.FileSelected += path => AddChunk(path);
         }
 
