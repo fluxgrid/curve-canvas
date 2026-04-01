@@ -1,6 +1,7 @@
 [gd_scene format=4 uid="uid://dbh3b884lwvjo"]
 
 [ext_resource type="Script" path="res://addons/curve_canvas/InGameEditorUI.cs" id="1"]
+[ext_resource type="PackedScene" path="res://addons/curve_canvas/SplineContextMenu.tscn" id="2"]
 
 [node name="InGameEditorUI" type="CanvasLayer"]
 script = ExtResource("1")
@@ -57,3 +58,6 @@ size = Vector2i(800, 520)
 access = 1
 file_mode = 0
 filters = PackedStringArray("*.curvecanvas.json ;CurveCanvas Level")
+
+[node name="SplineContextMenu" parent="UiRoot" instance=ExtResource("2")]
+visible = false

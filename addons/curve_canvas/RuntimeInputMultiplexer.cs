@@ -32,6 +32,7 @@ public partial class RuntimeInputMultiplexer : Node
     public float PropBrushFallbackInterval { get; set; } = 3.0f;
 
     private const float HandleRayLength = 4096f;
+    private const float HandleTapThreshold = 0.01f;
 
     public SandboxState CurrentState => _currentState;
 
@@ -52,6 +53,8 @@ public partial class RuntimeInputMultiplexer : Node
     private int _draggedPointIndex = -1;
     private Vector3 _dragStartPosition = Vector3.Zero;
     private Vector3 _dragCurrentPosition = Vector3.Zero;
+    private bool _handleDragMoved;
+    private SplineContextMenu? _splineContextMenu;
 
     public override void _Ready()
     {
@@ -90,6 +93,29 @@ public partial class RuntimeInputMultiplexer : Node
     public void ConfigureUndoRedo(UndoRedo? undoRedo)
     {
         _undoRedo = undoRedo;
+    }
+
+    public void ConfigureSplineContextMenu(SplineContextMenu? menu)
+    {
+        if (_splineContextMenu == menu)
+        {
+            return;
+        }
+
+        if (_splineContextMenu != null)
+        {
+            _splineContextMenu.DeletePointRequested -= OnDeletePointRequested;
+            _splineContextMenu.InsertPointRequested -= OnInsertPointRequested;
+        }
+
+        _splineContextMenu = menu;
+
+        if (_splineContextMenu != null)
+        {
+            _splineContextMenu.HideMenu();
+            _splineContextMenu.DeletePointRequested += OnDeletePointRequested;
+            _splineContextMenu.InsertPointRequested += OnInsertPointRequested;
+        }
     }
 
     private void DispatchInteraction(Vector3 hitPosition, bool isDrag)
@@ -186,6 +212,100 @@ public partial class RuntimeInputMultiplexer : Node
         return camera != null && camera.IsMultiTouchGestureActive;
     }
 
+    private void ShowSplineContextMenu(int pointIndex)
+    {
+        var menu = _splineContextMenu;
+        var camera = GetRuntimeCamera();
+        var curve = GetTrackGenerator()?.Curve;
+        if (menu == null || camera == null || curve == null || pointIndex < 0 || pointIndex >= curve.GetPointCount())
+        {
+            return;
+        }
+
+        var worldPosition = curve.GetPointPosition(pointIndex);
+        var screenPosition = camera.UnprojectPosition(worldPosition);
+        menu.ShowAt(screenPosition, pointIndex);
+    }
+
+    private void HideSplineContextMenu()
+    {
+        _splineContextMenu?.HideMenu();
+    }
+
+    private void OnDeletePointRequested(int pointIndex)
+    {
+        HideSplineContextMenu();
+        var curve = GetTrackGenerator()?.Curve;
+        if (curve == null || pointIndex < 0 || pointIndex >= curve.GetPointCount())
+        {
+            return;
+        }
+
+        var position = curve.GetPointPosition(pointIndex);
+        var inVec = curve.GetPointIn(pointIndex);
+        var outVec = curve.GetPointOut(pointIndex);
+        var command = new DeletePointCommand(curve, pointIndex, position, inVec, outVec);
+
+        if (_undoRedo == null)
+        {
+            command.Do();
+            return;
+        }
+
+        _undoRedo.CreateAction("Delete Spline Point");
+        _undoRedo.AddDoMethod(new Callable(command, nameof(DeletePointCommand.Do)));
+        _undoRedo.AddUndoMethod(new Callable(command, nameof(DeletePointCommand.Undo)));
+        _undoRedo.AddDoReference(command);
+        _undoRedo.AddUndoReference(command);
+        _undoRedo.CommitAction();
+    }
+
+    private void OnInsertPointRequested(int pointIndex)
+    {
+        HideSplineContextMenu();
+        var curve = GetTrackGenerator()?.Curve;
+        if (curve == null)
+        {
+            return;
+        }
+
+        var count = curve.GetPointCount();
+        if (count < 2 || pointIndex < 0 || pointIndex >= count)
+        {
+            return;
+        }
+
+        Vector3 neighbor;
+        int insertIndex;
+        var basePosition = curve.GetPointPosition(pointIndex);
+        if (pointIndex < count - 1)
+        {
+            neighbor = curve.GetPointPosition(pointIndex + 1);
+            insertIndex = pointIndex + 1;
+        }
+        else
+        {
+            neighbor = curve.GetPointPosition(pointIndex - 1);
+            insertIndex = pointIndex;
+        }
+
+        var newPosition = (basePosition + neighbor) * 0.5f;
+        var command = new InsertPointCommand(curve, insertIndex, newPosition);
+
+        if (_undoRedo == null)
+        {
+            command.Do();
+            return;
+        }
+
+        _undoRedo.CreateAction("Insert Spline Point");
+        _undoRedo.AddDoMethod(new Callable(command, nameof(InsertPointCommand.Do)));
+        _undoRedo.AddUndoMethod(new Callable(command, nameof(InsertPointCommand.Undo)));
+        _undoRedo.AddDoReference(command);
+        _undoRedo.AddUndoReference(command);
+        _undoRedo.CommitAction();
+    }
+
     private GodotObject? GetCurveCanvas()
     {
         if (_curveCanvas != null && IsInstanceValid(_curveCanvas))
@@ -275,6 +395,7 @@ public partial class RuntimeInputMultiplexer : Node
         if (mouseButton.Pressed)
         {
             _isPointerDown = true;
+            HideSplineContextMenu();
             if (_currentState == SandboxState.PropBrush)
             {
                 BeginPropStroke();
@@ -317,6 +438,7 @@ public partial class RuntimeInputMultiplexer : Node
         if (_currentState == SandboxState.Select && _draggedPointIndex != -1)
         {
             UpdateDraggedPoint(mouseMotion.Position);
+            HideSplineContextMenu();
             GetViewport()?.SetInputAsHandled();
             return;
         }
@@ -334,6 +456,7 @@ public partial class RuntimeInputMultiplexer : Node
         if (touchEvent.Pressed)
         {
             _isPointerDown = true;
+            HideSplineContextMenu();
             if (_currentState == SandboxState.PropBrush)
             {
                 BeginPropStroke();
@@ -372,6 +495,11 @@ public partial class RuntimeInputMultiplexer : Node
         if (camera == null)
         {
             return;
+        }
+
+        if (!isDrag)
+        {
+            HideSplineContextMenu();
         }
 
         var hit = camera.GetZZeroIntersection(screenPosition);
@@ -683,6 +811,8 @@ public partial class RuntimeInputMultiplexer : Node
         _draggedPointIndex = index;
         _dragStartPosition = curve.GetPointPosition(index);
         _dragCurrentPosition = _dragStartPosition;
+        _handleDragMoved = false;
+        HideSplineContextMenu();
         return true;
     }
 
@@ -711,6 +841,10 @@ public partial class RuntimeInputMultiplexer : Node
         position.Z = 0f;
         curve.SetPointPosition(_draggedPointIndex, position);
         _dragCurrentPosition = position;
+        if (!_handleDragMoved && (_dragStartPosition - position).LengthSquared() > HandleTapThreshold * HandleTapThreshold)
+        {
+            _handleDragMoved = true;
+        }
     }
 
     private void CommitHandleDrag()
@@ -732,8 +866,18 @@ public partial class RuntimeInputMultiplexer : Node
         var start = _dragStartPosition;
         var end = _dragCurrentPosition;
         _draggedPointIndex = -1;
+        _dragStartPosition = Vector3.Zero;
+        _dragCurrentPosition = Vector3.Zero;
+        var wasTap = !_handleDragMoved || (start - end).LengthSquared() <= HandleTapThreshold * HandleTapThreshold;
+        _handleDragMoved = false;
 
-        if (_undoRedo == null || start.IsEqualApprox(end))
+        if (wasTap)
+        {
+            ShowSplineContextMenu(index);
+            return;
+        }
+
+        if (_undoRedo == null)
         {
             return;
         }
@@ -821,6 +965,84 @@ public partial class RuntimeInputMultiplexer : Node
             }
 
             _curve.SetPointPosition(_index, _position);
+        }
+    }
+
+    private sealed partial class DeletePointCommand : RefCounted
+    {
+        private readonly Curve3D _curve;
+        private readonly int _index;
+        private readonly Vector3 _position;
+        private readonly Vector3 _in;
+        private readonly Vector3 _out;
+
+        public DeletePointCommand(Curve3D curve, int index, Vector3 position, Vector3 inHandle, Vector3 outHandle)
+        {
+            _curve = curve;
+            _index = index;
+            _position = position;
+            _in = inHandle;
+            _out = outHandle;
+        }
+
+        public void Do()
+        {
+            if (!GodotObject.IsInstanceValid(_curve))
+            {
+                return;
+            }
+
+            if (_index >= 0 && _index < _curve.GetPointCount())
+            {
+                _curve.RemovePoint(_index);
+            }
+        }
+
+        public void Undo()
+        {
+            if (!GodotObject.IsInstanceValid(_curve))
+            {
+                return;
+            }
+
+            _curve.AddPoint(_position, _in, _out, _index);
+        }
+    }
+
+    private sealed partial class InsertPointCommand : RefCounted
+    {
+        private readonly Curve3D _curve;
+        private readonly int _index;
+        private readonly Vector3 _position;
+
+        public InsertPointCommand(Curve3D curve, int index, Vector3 position)
+        {
+            _curve = curve;
+            _index = index;
+            _position = position;
+        }
+
+        public void Do()
+        {
+            if (!GodotObject.IsInstanceValid(_curve))
+            {
+                return;
+            }
+
+            _curve.AddPoint(_position, Vector3.Zero, Vector3.Zero, _index);
+        }
+
+        public void Undo()
+        {
+            if (!GodotObject.IsInstanceValid(_curve))
+            {
+                return;
+            }
+
+            if (_index >= 0 && _index < _curve.GetPointCount())
+            {
+                _curve.RemovePoint(_index);
+            }
         }
     }
 }

@@ -27,6 +27,7 @@ public partial class InGameEditorUI : CanvasLayer
     private Label? _activeFileLabel;
     private FileDialog? _exportDialog;
     private FileDialog? _importDialog;
+    private SplineContextMenu? _splineContextMenu;
     private LevelMetadataPanel? _metadataPanel;
     private PackedScene? _triggerPrefab;
     private Node? _sceneRoot;
@@ -40,6 +41,7 @@ public partial class InGameEditorUI : CanvasLayer
         _triggerPrefab = GD.Load<PackedScene>(TriggerPrefabPath);
         BuildToolbar();
         CreateDialogs();
+        InitializeContextMenu();
         CallDeferred(nameof(InitializeAfterSceneReady));
         UpdateActiveFileLabel();
     }
@@ -138,6 +140,12 @@ public partial class InGameEditorUI : CanvasLayer
         ConfigureDialog(_importDialog, OnImportFileSelected);
     }
 
+    private void InitializeContextMenu()
+    {
+        _splineContextMenu ??= _uiRoot?.GetNodeOrNull<SplineContextMenu>("SplineContextMenu");
+        _splineContextMenu?.HideMenu();
+    }
+
     private void OnExportButtonPressed()
     {
         _exportDialog?.PopupCenteredRatio();
@@ -230,6 +238,7 @@ public partial class InGameEditorUI : CanvasLayer
         {
             multiplexer.ConfigureUndoRedo(RuntimeUndoRedo);
             multiplexer.SetSandboxState(_activeSandboxState);
+            multiplexer.ConfigureSplineContextMenu(_splineContextMenu);
         }
     }
 
