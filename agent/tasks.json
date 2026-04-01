@@ -14,5 +14,6 @@
     {"id": 24, "name": "Implement Active File tracking (Quick Save) and In-Memory Snapshotting for Play/Edit toggling."},
     {"id": 25, "name": "Implement Boot-Time Level Loading to decouple scene data from the .tscn file."},
     {"id": 26, "name": "Implement Hybrid Camera Navigation (Mouse middle-click/scroll + Touch two-finger pan/pinch)."},
-    {"id": 27, "name": "Implement Spline Context Menu for Point Deletion and Insertion."}
+    {"id": 27, "name": "Implement Spline Context Menu for Point Deletion and Insertion."},
+    {"id": 28, "name": "Implement Asset Palette UI to allow dynamically switching the active Prop Brush prefab."}
 ]
