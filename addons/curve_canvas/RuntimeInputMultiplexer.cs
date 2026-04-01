@@ -77,6 +77,7 @@ public partial class RuntimeInputMultiplexer : Node
     private int _selectedPointIndex = -1;
     private SplineContextMenu? _splineContextMenu;
     private PackedScene? _activePropPrefab;
+    private bool _inputEnabled = true;
 
     public override void _Ready()
     {
@@ -85,6 +86,11 @@ public partial class RuntimeInputMultiplexer : Node
 
     public override void _UnhandledInput(InputEvent @event)
     {
+        if (!_inputEnabled)
+        {
+            return;
+        }
+
         if ((@event is InputEventScreenTouch || @event is InputEventScreenDrag) && CameraConsumingMultiTouch())
         {
             return;
@@ -115,6 +121,24 @@ public partial class RuntimeInputMultiplexer : Node
     public void ConfigureUndoRedo(UndoRedo? undoRedo)
     {
         _undoRedo = undoRedo;
+    }
+
+    public void SetInteractionEnabled(bool enabled)
+    {
+        if (_inputEnabled == enabled)
+        {
+            return;
+        }
+
+        _inputEnabled = enabled;
+        if (!enabled)
+        {
+            _isPointerDown = false;
+            _draggedPointIndex = -1;
+            _draggedHandleType = DraggedHandleType.None;
+            _currentStrokeNodes.Clear();
+            _strokeNodeSet.Clear();
+        }
     }
 
     public void ConfigureSplineContextMenu(SplineContextMenu? menu)
