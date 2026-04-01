@@ -35,10 +35,24 @@ public partial class SequenceEditorPanel : PanelContainer
 
         _chunkList!.ItemSelected += _ => UpdateButtonStates();
 
-        _addChunkDialog!.FileSelected += path => AddChunk(path);
+        if (_addChunkDialog != null)
+        {
+            _addChunkDialog.Access = FileDialog.AccessEnum.Resources;
+            _addChunkDialog.FileSelected += path => AddChunk(path);
+        }
+
         _loadSequenceDialog = GetNodeOrNull<FileDialog>("LoadSequenceDialog");
-        _saveSequenceDialog!.FileSelected += path => CurveSequenceSerializer.Save(path, _sequenceData);
-        _loadSequenceDialog!.FileSelected += path => LoadSequence(path);
+        if (_loadSequenceDialog != null)
+        {
+            _loadSequenceDialog.Access = FileDialog.AccessEnum.Userdata;
+            _loadSequenceDialog.FileSelected += path => LoadSequence(path);
+        }
+
+        if (_saveSequenceDialog != null)
+        {
+            _saveSequenceDialog.Access = FileDialog.AccessEnum.Userdata;
+            _saveSequenceDialog.FileSelected += path => CurveSequenceSerializer.Save(path, _sequenceData);
+        }
 
         UpdateButtonStates();
     }
