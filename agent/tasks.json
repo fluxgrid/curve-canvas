@@ -19,5 +19,6 @@
     {"id": 29, "name": "Implement Socket Visualization and 'Attach Segment Preview' tool."},
     {"id": 30, "name": "Implement Bezier Tangent Handles for active curve manipulation."},
     {"id": 31, "name": "Add Smooth and Sharpen (Linear) tangent controls to the Spline Context Menu."},
-    {"id": 32, "name": "Implement Sequence Authoring Mode with 3D Spatial Visualization."}
+    {"id": 32, "name": "Implement Sequence Authoring Mode with 3D Spatial Visualization."},
+    {"id": 33, "name": "Implement ChunkLibrary, base ChunkDefinition resource, and both Authored and Procedural chunk implementations."}
 ]
