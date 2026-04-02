@@ -199,6 +199,49 @@ public static class CurveCanvasImporter
         }
     }
 
+    /// <summary>
+    /// Extracts spline point dictionaries from a serialized CurveCanvas chunk without touching the active scene.
+    /// </summary>
+    public static Godot.Collections.Array<Godot.Collections.Dictionary> ExtractSplineData(string? filePath)
+    {
+        var points = new Godot.Collections.Array<Godot.Collections.Dictionary>();
+        if (string.IsNullOrWhiteSpace(filePath))
+        {
+            GD.PushError("[CurveCanvasImporter] ExtractSplineData requires a valid file path.");
+            return points;
+        }
+
+        if (!FileAccess.FileExists(filePath))
+        {
+            GD.PushError($"[CurveCanvasImporter] ExtractSplineData could not find '{filePath}'.");
+            return points;
+        }
+
+        string json;
+        try
+        {
+            json = FileAccess.GetFileAsString(filePath);
+        }
+        catch (Exception ex)
+        {
+            GD.PushError($"[CurveCanvasImporter] ExtractSplineData failed to read '{filePath}': {ex.Message}");
+            return points;
+        }
+
+        var data = DeserializeCanvasData(json);
+        if (data?.Spline == null)
+        {
+            return points;
+        }
+
+        foreach (var point in data.Spline)
+        {
+            points.Add(CreateSplineDictionary(point));
+        }
+
+        return points;
+    }
+
     private static Node EnsureTriggerContainer(Node rootNode, Node? owner)
     {
         Node? container = null;
@@ -325,6 +368,16 @@ public static class CurveCanvasImporter
         {
             GD.PushWarning($"[CurveCanvasImporter] Failed to set property '{propertyName}' on '{target.GetType().Name}': {ex.Message}");
         }
+    }
+
+    private static Godot.Collections.Dictionary CreateSplineDictionary(CurveCanvasSplinePoint point)
+    {
+        return new Godot.Collections.Dictionary
+        {
+            ["position"] = new Vector3(point.X, point.Y, 0f),
+            ["point_in"] = new Vector3(point.InX, point.InY, 0f),
+            ["point_out"] = new Vector3(point.OutX, point.OutY, 0f)
+        };
     }
 
     private static string DetermineTriggerName(CameraTriggerData data, int index)
