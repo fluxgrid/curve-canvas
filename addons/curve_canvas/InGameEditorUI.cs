@@ -33,6 +33,7 @@ public partial class InGameEditorUI : CanvasLayer
     private ButtonGroup? _toolButtonGroup;
     private Button? _selectToolButton;
     private Button? _drawToolButton;
+    private Button? _freehandToolButton;
     private Button? _propToolButton;
     private Button? _saveButton;
     private Button? _exportButton;
@@ -67,6 +68,7 @@ public partial class InGameEditorUI : CanvasLayer
     private Node3D? _primaryTrackNode;
     private Node3D? _primarySplineHandles;
     private bool _sequenceModeActive;
+    private bool _freehandModeActive;
 
     public override void _Ready()
     {
@@ -458,6 +460,7 @@ public partial class InGameEditorUI : CanvasLayer
             multiplexer.ConfigureSplineContextMenu(_splineContextMenu);
             multiplexer.ActivePropPrefab = _activePropPrefab;
         }
+        ApplyFreehandModeToMultiplexers();
     }
 
     private static void CollectMultiplexers(Node node, List<RuntimeInputMultiplexer> results)
@@ -564,6 +567,20 @@ public partial class InGameEditorUI : CanvasLayer
         }
     }
 
+    private void OnFreehandButtonToggled(bool pressed)
+    {
+        _freehandModeActive = pressed;
+        ApplyFreehandModeToMultiplexers();
+    }
+
+    private void ApplyFreehandModeToMultiplexers()
+    {
+        foreach (var multiplexer in _multiplexers)
+        {
+            multiplexer.IsFreehandModeActive = _freehandModeActive;
+        }
+    }
+
     private void UpdatePreviewButtonsState()
     {
         if (_clearPreviewButton != null)
@@ -578,11 +595,13 @@ public partial class InGameEditorUI : CanvasLayer
 
         _selectToolButton ??= _toolButtonsContainer?.GetNodeOrNull<Button>("SelectButton");
         _drawToolButton ??= _toolButtonsContainer?.GetNodeOrNull<Button>("DrawButton");
+        _freehandToolButton ??= _toolButtonsContainer?.GetNodeOrNull<Button>("FreehandButton");
         _propToolButton ??= _toolButtonsContainer?.GetNodeOrNull<Button>("PropBrushButton");
 
         ConfigureToolButton(_selectToolButton, RuntimeInputMultiplexer.SandboxState.Select, isDefault: true);
         ConfigureToolButton(_drawToolButton, RuntimeInputMultiplexer.SandboxState.DrawSpline);
         ConfigureToolButton(_propToolButton, RuntimeInputMultiplexer.SandboxState.PropBrush);
+        ConfigureFreehandButton();
         ApplyActiveSandboxState();
     }
 
@@ -610,6 +629,19 @@ public partial class InGameEditorUI : CanvasLayer
                 }
             };
         }
+    }
+
+    private void ConfigureFreehandButton()
+    {
+        if (_freehandToolButton == null)
+        {
+            return;
+        }
+
+        _freehandToolButton.ToggleMode = true;
+        _freehandToolButton.Toggled -= OnFreehandButtonToggled;
+        _freehandToolButton.Toggled += OnFreehandButtonToggled;
+        _freehandToolButton.SetPressedNoSignal(_freehandModeActive);
     }
 
     private void EnsureActionButtons()

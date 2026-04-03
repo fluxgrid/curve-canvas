@@ -29,6 +29,10 @@ button_pressed = true
 text = "Draw Spline"
 toggle_mode = true
 
+[node name="FreehandButton" type="Button" parent="UiRoot/Toolbar/ToolButtons"]
+text = "Freehand"
+toggle_mode = true
+
 [node name="PropBrushButton" type="Button" parent="UiRoot/Toolbar/ToolButtons"]
 text = "Prop Brush"
 toggle_mode = true

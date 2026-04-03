@@ -34,6 +34,11 @@ public partial class RuntimeInputMultiplexer : Node
     [Export(PropertyHint.Range, "0.25,20,0.25")]
     public float PropBrushFallbackInterval { get; set; } = 3.0f;
 
+    [Export(PropertyHint.Range, "0.1,20,0.1")]
+    public float DrawStepDistance { get; set; } = 2.0f;
+
+    public bool IsFreehandModeActive { get; set; } = false;
+
     public PackedScene? ActivePropPrefab
     {
         get => _activePropPrefab;
@@ -78,6 +83,10 @@ public partial class RuntimeInputMultiplexer : Node
     private SplineContextMenu? _splineContextMenu;
     private PackedScene? _activePropPrefab;
     private bool _inputEnabled = true;
+    private bool _isFreehandDrawing;
+    private Vector3 _lastDrawnPoint = Vector3.Zero;
+    private int _freehandStartIndex;
+    private readonly List<FreehandPoint> _freehandPoints = new();
 
     public override void _Ready()
     {
@@ -558,6 +567,12 @@ public partial class RuntimeInputMultiplexer : Node
                 BeginPropStroke();
             }
 
+            if (_currentState == SandboxState.DrawSpline && IsFreehandModeActive && TryBeginFreehandStroke(mouseButton.Position))
+            {
+                GetViewport()?.SetInputAsHandled();
+                return;
+            }
+
             if (_currentState == SandboxState.Select && TryBeginHandleDrag(mouseButton.Position))
             {
                 GetViewport()?.SetInputAsHandled();
@@ -578,6 +593,10 @@ public partial class RuntimeInputMultiplexer : Node
             {
                 CommitHandleDrag();
             }
+            else if (_isFreehandDrawing)
+            {
+                EndFreehandStroke();
+            }
             else
             {
                 ClearStrokeState();
@@ -589,6 +608,13 @@ public partial class RuntimeInputMultiplexer : Node
     {
         if (!_isPointerDown || (mouseMotion.ButtonMask & MouseButtonMask.Left) == 0)
         {
+            return;
+        }
+
+        if (_isFreehandDrawing)
+        {
+            ContinueFreehandStroke(mouseMotion.Position);
+            GetViewport()?.SetInputAsHandled();
             return;
         }
 
@@ -619,6 +645,12 @@ public partial class RuntimeInputMultiplexer : Node
                 BeginPropStroke();
             }
 
+            if (_currentState == SandboxState.DrawSpline && IsFreehandModeActive && TryBeginFreehandStroke(touchEvent.Position))
+            {
+                GetViewport()?.SetInputAsHandled();
+                return;
+            }
+
             if (_currentState == SandboxState.Select && TryBeginHandleDrag(touchEvent.Position))
             {
                 GetViewport()?.SetInputAsHandled();
@@ -638,6 +670,10 @@ public partial class RuntimeInputMultiplexer : Node
             else if (_draggedPointIndex != -1)
             {
                 CommitHandleDrag();
+            }
+            else if (_isFreehandDrawing)
+            {
+                EndFreehandStroke();
             }
             else
             {
@@ -1239,6 +1275,196 @@ public partial class RuntimeInputMultiplexer : Node
         var offset = CurveCanvasMath.GetClosestOffset(curve, position, out _);
         var snapped = curve.SampleBaked(offset);
         return new Vector3(position.X, snapped.Y, track.PropBrushDepthZ);
+    }
+
+    private Vector3? GetMousePositionOnZPlane(Vector2 screenPos)
+    {
+        var camera = GetRuntimeCamera();
+        if (camera == null)
+        {
+            return null;
+        }
+
+        var drawPlane = new Plane(Vector3.Forward, 0f);
+        var origin = camera.ProjectRayOrigin(screenPos);
+        var direction = camera.ProjectRayNormal(screenPos);
+        var intersection = drawPlane.IntersectsRay(origin, direction);
+        if (intersection == null)
+        {
+            return null;
+        }
+
+        var point = intersection.Value;
+        point.Z = 0f;
+        return point;
+    }
+
+    private bool TryBeginFreehandStroke(Vector2 screenPosition)
+    {
+        if (!IsFreehandModeActive || _currentState != SandboxState.DrawSpline)
+        {
+            return false;
+        }
+
+        var track = GetTrackGenerator();
+        var curve = track?.Curve;
+        if (curve == null)
+        {
+            return false;
+        }
+
+        var worldPoint = GetMousePositionOnZPlane(screenPosition);
+        if (worldPoint == null)
+        {
+            return false;
+        }
+
+        _freehandPoints.Clear();
+        _isFreehandDrawing = true;
+        _freehandStartIndex = curve.GetPointCount();
+        var position = worldPoint.Value;
+        curve.AddPoint(position);
+        var newIndex = curve.GetPointCount() - 1;
+        ApplyFreehandSmoothing(curve, newIndex);
+        _freehandPoints.Add(CapturePoint(curve, newIndex));
+        _lastDrawnPoint = position;
+        return true;
+    }
+
+    private void ContinueFreehandStroke(Vector2 screenPosition)
+    {
+        if (!_isFreehandDrawing)
+        {
+            return;
+        }
+
+        var track = GetTrackGenerator();
+        var curve = track?.Curve;
+        if (curve == null)
+        {
+            return;
+        }
+
+        var worldPoint = GetMousePositionOnZPlane(screenPosition);
+        if (worldPoint == null)
+        {
+            return;
+        }
+
+        if (worldPoint.Value.DistanceTo(_lastDrawnPoint) < DrawStepDistance)
+        {
+            return;
+        }
+
+        curve.AddPoint(worldPoint.Value);
+        var newIndex = curve.GetPointCount() - 1;
+        ApplyFreehandSmoothing(curve, newIndex);
+        _freehandPoints.Add(CapturePoint(curve, newIndex));
+        _lastDrawnPoint = worldPoint.Value;
+    }
+
+    private void EndFreehandStroke()
+    {
+        if (!_isFreehandDrawing)
+        {
+            return;
+        }
+
+        _isFreehandDrawing = false;
+        if (_freehandPoints.Count == 0)
+        {
+            return;
+        }
+
+        var track = GetTrackGenerator();
+        var curve = track?.Curve;
+        if (curve == null)
+        {
+            _freehandPoints.Clear();
+            return;
+        }
+
+        if (_undoRedo != null)
+        {
+            var captured = _freehandPoints.ToArray();
+            RemoveRecentPoints(curve, captured.Length);
+            var curveRef = curve;
+            var insertionIndex = _freehandStartIndex;
+            _undoRedo.CreateAction("Freehand Stroke");
+            _undoRedo.AddDoMethod(Callable.From(() => AddCapturedPoints(curveRef, captured, insertionIndex)));
+            _undoRedo.AddUndoMethod(Callable.From(() => RemoveCapturedPoints(curveRef, captured.Length, insertionIndex)));
+            _undoRedo.CommitAction();
+        }
+
+        _freehandPoints.Clear();
+    }
+
+    private static void ApplyFreehandSmoothing(Curve3D curve, int newPointIndex)
+    {
+        if (newPointIndex <= 0)
+        {
+            return;
+        }
+
+        var current = curve.GetPointPosition(newPointIndex);
+        var previous = curve.GetPointPosition(newPointIndex - 1);
+        var offset = (current - previous) * 0.25f;
+        curve.SetPointOut(newPointIndex - 1, offset);
+        curve.SetPointIn(newPointIndex, -offset);
+    }
+
+    private static FreehandPoint CapturePoint(Curve3D curve, int index)
+    {
+        return new FreehandPoint
+        {
+            Position = curve.GetPointPosition(index),
+            PointIn = curve.GetPointIn(index),
+            PointOut = curve.GetPointOut(index)
+        };
+    }
+
+    private static void AddCapturedPoints(Curve3D curve, FreehandPoint[] points, int insertionIndex)
+    {
+        var insertAt = insertionIndex;
+        foreach (var point in points)
+        {
+            curve.AddPoint(point.Position, point.PointIn, point.PointOut, insertAt);
+            insertAt++;
+        }
+    }
+
+    private static void RemoveCapturedPoints(Curve3D curve, int count, int startIndex)
+    {
+        for (var i = 0; i < count; i++)
+        {
+            if (curve.GetPointCount() <= startIndex)
+            {
+                break;
+            }
+
+            curve.RemovePoint(startIndex);
+        }
+    }
+
+    private static void RemoveRecentPoints(Curve3D curve, int count)
+    {
+        for (var i = 0; i < count; i++)
+        {
+            var target = curve.GetPointCount() - 1;
+            if (target < 0)
+            {
+                break;
+            }
+
+            curve.RemovePoint(target);
+        }
+    }
+
+    private readonly record struct FreehandPoint
+    {
+        public Vector3 Position { get; init; }
+        public Vector3 PointIn { get; init; }
+        public Vector3 PointOut { get; init; }
     }
 
     private sealed partial class CurvePointAction : RefCounted
