@@ -10,6 +10,9 @@ public partial class LevelSelectMenu : Control
     [Export(PropertyHint.File, "*.tscn")]
     public string DemoScenePath { get; set; } = "res://scenes/CurveCanvasDemo.tscn";
 
+    [Export(PropertyHint.File, "*.tscn")]
+    public string PlayScenePath { get; set; } = "res://scenes/PlaytestRunner.tscn";
+
     [Export]
     public Array<string> SearchDirectories { get; set; } = new() { "user://Levels/" };
 
@@ -54,29 +57,69 @@ public partial class LevelSelectMenu : Control
 
     private void AddLevelButton(string path)
     {
+        if (_listContainer == null)
+        {
+            return;
+        }
+
         var fileName = System.IO.Path.GetFileName(path);
-        var button = new Button
+        var row = new HBoxContainer
+        {
+            Name = $"Entry_{fileName}"
+        };
+        row.AddThemeConstantOverride("separation", 8);
+
+        var label = new Label
         {
             Text = fileName,
+            SizeFlagsHorizontal = SizeFlags.ExpandFill,
+            HorizontalAlignment = HorizontalAlignment.Left
+        };
+
+        var editButton = new Button
+        {
+            Text = "Edit",
             FocusMode = FocusModeEnum.None
         };
-        button.Pressed += () => OnLevelSelected(path);
-        _listContainer?.AddChild(button);
+        editButton.Pressed += () => LaunchEdit(path);
+
+        var playButton = new Button
+        {
+            Text = "Play",
+            FocusMode = FocusModeEnum.None
+        };
+        playButton.Pressed += () => LaunchPlay(path);
+
+        row.AddChild(label);
+        row.AddChild(editButton);
+        row.AddChild(playButton);
+        _listContainer.AddChild(row);
     }
 
-    private void OnLevelSelected(string path)
+    private void LaunchEdit(string path)
     {
         RuntimeLevelSession.SetPendingLevel(path);
+        ChangeSceneSafe(DemoScenePath);
+    }
+
+    private void LaunchPlay(string path)
+    {
+        RuntimeLevelSession.SetPendingLevel(path);
+        ChangeSceneSafe(PlayScenePath);
+    }
+
+    private void ChangeSceneSafe(string scenePath)
+    {
         var tree = GetTree();
         if (tree == null)
         {
             return;
         }
 
-        var error = tree.ChangeSceneToFile(DemoScenePath);
+        var error = tree.ChangeSceneToFile(scenePath);
         if (error != Error.Ok)
         {
-            GD.PushError($"[LevelSelectMenu] Failed to load demo scene '{DemoScenePath}': {error}");
+            GD.PushError($"[LevelSelectMenu] Failed to load scene '{scenePath}': {error}");
         }
     }
 
