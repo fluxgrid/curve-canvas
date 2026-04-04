@@ -25,6 +25,7 @@ public partial class EndlessLevelDirector : Node
     private Vector3 _lastExitSocketPosition = Vector3.Zero;
     private string _currentSpeedState = "Any";
     private int _chunkCounter;
+    private Vector3 _streamStartPosition = Vector3.Zero;
 
     public override void _Ready()
     {
@@ -115,7 +116,11 @@ public partial class EndlessLevelDirector : Node
         }
 
         AddChild(track, true);
-        var (_, lastPoint) = RuntimeSplineUtility.AppendPoints(track.Curve, points, skipFirstPoint, Vector3.Zero);
+        var (startPoint, lastPoint) = RuntimeSplineUtility.AppendPoints(track.Curve, points, skipFirstPoint, Vector3.Zero);
+        if (startPoint.HasValue && _activeChunks.Count == 0)
+        {
+            _streamStartPosition = startPoint.Value;
+        }
         if (lastPoint == null)
         {
             track.QueueFree();
@@ -170,6 +175,7 @@ public partial class EndlessLevelDirector : Node
         _lastExitSocketPosition = startPosition;
         _currentSpeedState = "Any";
         _chunkCounter = 0;
+        _streamStartPosition = startPosition;
     }
 
     private void ClearActiveChunks()
@@ -183,6 +189,11 @@ public partial class EndlessLevelDirector : Node
         }
 
         _activeChunks.Clear();
+    }
+
+    public Vector3 GetStreamStartPosition()
+    {
+        return _streamStartPosition;
     }
 
     private sealed class ChunkInstance

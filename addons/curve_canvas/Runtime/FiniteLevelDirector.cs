@@ -17,6 +17,9 @@ public partial class FiniteLevelDirector : Node
     public NodePath TrackGeneratorPath { get; set; } = new();
 
     [Export]
+    public NodePath EndlessDirectorPath { get; set; } = new("../EndlessLevelDirector");
+
+    [Export]
     public PackedScene? PlayerScene { get; set; }
 
     [Export]
@@ -25,9 +28,16 @@ public partial class FiniteLevelDirector : Node
     private TrackMeshGenerator? _trackGenerator;
     private Node3D? _playerInstance;
     private Area3D? _finishLine;
+    private EndlessLevelDirector? _endlessDirector;
+    private bool _isEndlessLevel;
 
     public override void _Ready()
     {
+        if (!EndlessDirectorPath.IsEmpty)
+        {
+            _endlessDirector = GetNodeOrNull<EndlessLevelDirector>(EndlessDirectorPath);
+        }
+
         var initialPath = LevelFilePath;
         if (RuntimeLevelSession.TryConsumePendingLevel(out var pendingPath))
         {
@@ -55,6 +65,17 @@ public partial class FiniteLevelDirector : Node
         }
 
         LevelFilePath = levelPath;
+        _isEndlessLevel = IsEndlessLevel(levelPath);
+        if (_isEndlessLevel)
+        {
+            if (TryStartEndlessLevel())
+            {
+                return;
+            }
+
+            _isEndlessLevel = false;
+        }
+
         var curve = _trackGenerator.Curve;
         curve.ClearPoints();
 
@@ -83,6 +104,29 @@ public partial class FiniteLevelDirector : Node
 
         SpawnPlayer(startPoint.Value);
         SpawnFinishLine(endPoint.Value);
+    }
+
+    private bool IsEndlessLevel(string path)
+    {
+        var metadata = CurveCanvasImporter.ExtractMetadata(path);
+        return metadata?.LevelMode?.Equals("Endless", StringComparison.OrdinalIgnoreCase) == true;
+    }
+
+    private bool TryStartEndlessLevel()
+    {
+        if (_endlessDirector == null)
+        {
+            GD.PushWarning("[FiniteLevelDirector] Level marked Endless but no EndlessLevelDirector is assigned.");
+            return false;
+        }
+
+        _trackGenerator?.Curve?.ClearPoints();
+        var spawn = Vector3.Zero;
+        _endlessDirector.ResetStream(spawn);
+        _endlessDirector.ProcessEndlessGeneration(spawn.X);
+        SpawnPlayer(spawn);
+        RemoveFinishLine();
+        return true;
     }
 
     private (Vector3? startPoint, Vector3? endPoint) LoadSingleChunk(string filePath, Curve3D curve)
@@ -204,6 +248,12 @@ public partial class FiniteLevelDirector : Node
 
     private void SpawnFinishLine(Vector3 position)
     {
+        if (_isEndlessLevel)
+        {
+            RemoveFinishLine();
+            return;
+        }
+
         Area3D finish;
         if (_finishLine == null)
         {
@@ -227,6 +277,15 @@ public partial class FiniteLevelDirector : Node
         }
 
         finish.GlobalPosition = position;
+    }
+
+    private void RemoveFinishLine()
+    {
+        if (_finishLine != null && IsInstanceValid(_finishLine))
+        {
+            _finishLine.QueueFree();
+            _finishLine = null;
+        }
     }
 
     private static Area3D CreateDefaultFinishArea()

@@ -248,6 +248,12 @@ public static class CurveCanvasImporter
         return string.IsNullOrWhiteSpace(data.SegmentType) ? fallback : data.SegmentType;
     }
 
+    public static CurveCanvasMetadata? ExtractMetadata(string? filePath)
+    {
+        var data = LoadExportData(filePath);
+        return data?.Metadata;
+    }
+
     private static Node EnsureTriggerContainer(Node rootNode, Node? owner)
     {
         Node? container = null;
