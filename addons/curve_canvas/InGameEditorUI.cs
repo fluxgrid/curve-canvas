@@ -34,6 +34,9 @@ public partial class InGameEditorUI : CanvasLayer
     public NodePath FiniteDirectorPath { get; set; } = new("../FiniteLevelDirector");
 
     [Export]
+    public NodePath EndlessDirectorPath { get; set; } = new("../EndlessLevelDirector");
+
+    [Export]
     public NodePath EditorCameraPath { get; set; } = new("../ArchitectCamera");
 
     [Export(PropertyHint.File, "*.tscn")]
@@ -55,6 +58,8 @@ public partial class InGameEditorUI : CanvasLayer
     private Button? _playtestButton;
     private Button? _stopPlaytestButton;
     private Button? _exitButton;
+    private OptionButton? _segmentTypeOption;
+    private OptionButton? _playModeOption;
     private Label? _activeFileLabel;
     private HBoxContainer? _modeButtonsContainer;
     private ButtonGroup? _modeButtonGroup;
@@ -86,15 +91,18 @@ public partial class InGameEditorUI : CanvasLayer
     private bool _sequenceModeActive;
     private bool _freehandModeActive;
     private bool _playtestActive;
+    private bool _useEndlessPlaytest;
     private PackedScene? _playtestCameraScene;
     private Camera3D? _playtestCameraInstance;
     private Camera3D? _editorCamera;
     private FiniteLevelDirector? _finiteDirector;
+    private EndlessLevelDirector? _endlessDirector;
     private readonly List<string> _playtestTempFiles = new();
     private string _playtestSnapshot = string.Empty;
 
     public override void _Ready()
     {
+        SetProcess(true);
         _triggerPrefab = GD.Load<PackedScene>(TriggerPrefabPath);
         BuildToolbar();
         CreateDialogs();
@@ -135,6 +143,18 @@ public partial class InGameEditorUI : CanvasLayer
         }
 
         GetViewport()?.SetInputAsHandled();
+    }
+
+    public override void _Process(double delta)
+    {
+        base._Process(delta);
+        if (!_playtestActive || !_useEndlessPlaytest)
+        {
+            return;
+        }
+
+        var cameraX = _playtestCameraInstance?.GlobalPosition.X ?? 0f;
+        _endlessDirector?.ProcessEndlessGeneration(cameraX);
     }
 
     private void InitializeAfterSceneReady()
@@ -673,10 +693,17 @@ public partial class InGameEditorUI : CanvasLayer
             return;
         }
 
-        var runtimePath = BuildRuntimeLevelPath();
-        if (!string.IsNullOrEmpty(runtimePath))
+        if (_useEndlessPlaytest)
         {
-            _finiteDirector?.LoadLevel(runtimePath);
+            StartEndlessPlaytest();
+        }
+        else
+        {
+            var runtimePath = BuildRuntimeLevelPath();
+            if (!string.IsNullOrEmpty(runtimePath))
+            {
+                _finiteDirector?.LoadLevel(runtimePath);
+            }
         }
 
         ToggleEditorVisibility(false);
@@ -706,6 +733,11 @@ public partial class InGameEditorUI : CanvasLayer
         {
             _playtestCameraInstance.QueueFree();
             _playtestCameraInstance = null;
+        }
+
+        if (_useEndlessPlaytest)
+        {
+            _endlessDirector?.ResetStream(Vector3.Zero);
         }
 
         RestorePlaytestSnapshot();
@@ -814,6 +846,19 @@ public partial class InGameEditorUI : CanvasLayer
         }
 
         return chunkPath;
+    }
+
+    private void StartEndlessPlaytest()
+    {
+        if (_endlessDirector == null)
+        {
+            GD.PushWarning("[InGameEditorUI] EndlessLevelDirector was not found; cannot start endless playtest.");
+            return;
+        }
+
+        var spawn = DeterminePlaytestSpawnPosition();
+        _endlessDirector.ResetStream(spawn);
+        _endlessDirector.ProcessEndlessGeneration(spawn.X);
     }
 
     private string? CreateTemporaryChunkFromScene()
@@ -1049,6 +1094,8 @@ public partial class InGameEditorUI : CanvasLayer
             _toolbar?.AddChild(_activeFileLabel);
         }
 
+        EnsureSegmentTypeOption();
+        EnsurePlayModeOption();
         EnsurePlaytestButtons();
         EnsureExitButton();
 
@@ -1064,6 +1111,74 @@ public partial class InGameEditorUI : CanvasLayer
         _clearPreviewButton.Pressed += OnClearPreviewButtonPressed;
         UpdateActiveFileLabel();
         UpdatePreviewButtonsState();
+    }
+
+    private void EnsureSegmentTypeOption()
+    {
+        if (_segmentTypeOption == null)
+        {
+            _segmentTypeOption = new OptionButton
+            {
+                Name = "SegmentTypeDropdown",
+                FocusMode = Control.FocusModeEnum.None,
+                TooltipText = "Select the current track profile"
+            };
+            _segmentTypeOption.AddItem("Flow", 0);
+            _segmentTypeOption.AddItem("Rail", 1);
+            _toolbar?.AddChild(_segmentTypeOption);
+        }
+
+        _segmentTypeOption.ItemSelected -= OnSegmentTypeOptionSelected;
+        _segmentTypeOption.ItemSelected += OnSegmentTypeOptionSelected;
+        UpdateSegmentTypeOption();
+    }
+
+    private void EnsurePlayModeOption()
+    {
+        if (_playModeOption == null)
+        {
+            _playModeOption = new OptionButton
+            {
+                Name = "PlayModeDropdown",
+                FocusMode = Control.FocusModeEnum.None,
+                TooltipText = "Choose between finite or endless playtests"
+            };
+            _playModeOption.AddItem("Finite Mode", 0);
+            _playModeOption.AddItem("Endless Mode", 1);
+            _toolbar?.AddChild(_playModeOption);
+        }
+
+        _playModeOption.ItemSelected -= OnPlayModeOptionSelected;
+        _playModeOption.ItemSelected += OnPlayModeOptionSelected;
+        _playModeOption.Select(_useEndlessPlaytest ? 1 : 0);
+    }
+
+    private void UpdateSegmentTypeOption()
+    {
+        if (_segmentTypeOption == null || _primaryTrackGenerator == null)
+        {
+            return;
+        }
+
+        var current = _primaryTrackGenerator.CurrentSegmentType;
+        var index = current.Equals("Rail", StringComparison.OrdinalIgnoreCase) ? 1 : 0;
+        _segmentTypeOption.Select(index);
+    }
+
+    private void OnSegmentTypeOptionSelected(long index)
+    {
+        if (_primaryTrackGenerator == null)
+        {
+            return;
+        }
+
+        var nextType = index == 1 ? "Rail" : "Flow";
+        _primaryTrackGenerator.SetSegmentType(nextType);
+    }
+
+    private void OnPlayModeOptionSelected(long index)
+    {
+        _useEndlessPlaytest = index == 1;
     }
 
     private void EnsurePlaytestButtons()
@@ -1276,6 +1391,11 @@ public partial class InGameEditorUI : CanvasLayer
             _finiteDirector = GetNodeOrNull<FiniteLevelDirector>(FiniteDirectorPath);
         }
 
+        if (HasNodePath(EndlessDirectorPath))
+        {
+            _endlessDirector = GetNodeOrNull<EndlessLevelDirector>(EndlessDirectorPath);
+        }
+
         if (HasNodePath(EditorCameraPath))
         {
             _editorCamera = GetNodeOrNull<Camera3D>(EditorCameraPath);
@@ -1301,6 +1421,8 @@ public partial class InGameEditorUI : CanvasLayer
         {
             _primarySplineHandles = GetNodeOrNull<Node3D>(PrimarySplineHandlesPath);
         }
+
+        UpdateSegmentTypeOption();
     }
 
     private static bool HasNodePath(NodePath path)

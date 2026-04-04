@@ -83,7 +83,7 @@ public partial class EndlessLevelDirector : Node
         }
 
         var skipFirstPoint = _activeChunks.Count > 0;
-        var track = InstantiateChunkTrack(splinePoints, skipFirstPoint);
+        var track = InstantiateChunkTrack(definition, splinePoints, skipFirstPoint);
         if (track == null)
         {
             return false;
@@ -101,13 +101,18 @@ public partial class EndlessLevelDirector : Node
         return true;
     }
 
-    private TrackMeshGenerator? InstantiateChunkTrack(Array<Dictionary> points, bool skipFirstPoint)
+    private TrackMeshGenerator? InstantiateChunkTrack(TrackChunkDefinition definition, Array<Dictionary> points, bool skipFirstPoint)
     {
         var track = new TrackMeshGenerator
         {
             Name = $"EndlessChunk_{_chunkCounter++}",
             Curve = new Curve3D()
         };
+
+        if (!string.IsNullOrWhiteSpace(definition.SegmentType))
+        {
+            track.SetSegmentType(definition.SegmentType);
+        }
 
         AddChild(track, true);
         var (_, lastPoint) = RuntimeSplineUtility.AppendPoints(track.Curve, points, skipFirstPoint, Vector3.Zero);
@@ -157,6 +162,27 @@ public partial class EndlessLevelDirector : Node
         }
 
         return _chunkLibrary;
+    }
+
+    public void ResetStream(Vector3 startPosition)
+    {
+        ClearActiveChunks();
+        _lastExitSocketPosition = startPosition;
+        _currentSpeedState = "Any";
+        _chunkCounter = 0;
+    }
+
+    private void ClearActiveChunks()
+    {
+        foreach (var chunk in _activeChunks)
+        {
+            if (chunk.Track != null && IsInstanceValid(chunk.Track))
+            {
+                chunk.Track.QueueFree();
+            }
+        }
+
+        _activeChunks.Clear();
     }
 
     private sealed class ChunkInstance
