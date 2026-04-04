@@ -40,6 +40,7 @@ Ensures tracks are highly portable and usable by any game engine or controller.
   3. Array of `SceneryObject` structs (ID, X/Y position, Z-Plane index).
   4. Array of `EventTriggers` (Camera pans, friction modifiers).
 * **Reconstruction Engine:** A standalone loader script that parses the JSON and rebuilds the `Path3D`, the custom `ArrayMesh`, and object instances at runtime in under a second.
+* **Level Storage Convention:** All exported, downloaded, or curated levels must live under `user://Levels/`. This keeps authored content inside the writable app-data sandbox (portable across platforms) and gives the runtime/browser a single canonical directory to scan (future subfolders such as `user://Levels/Downloaded` are allowed, but `user://Levels/` is the root).
 
 ### Module E: The Sandbox State Machine (Seamless Play/Edit)
 The editor operates within a single, unified sandbox scene to eliminate loading times between authoring and testing.
