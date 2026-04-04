@@ -109,6 +109,7 @@ public static class CurveCanvasExporter
         metadata.Author = Sanitize(overrides?.Author, "Anonymous");
         var parTime = overrides?.ParTimeSeconds ?? metadata.ParTimeSeconds;
         metadata.ParTimeSeconds = Math.Max(1f, parTime);
+        metadata.LevelMode = Sanitize(overrides?.LevelMode, metadata.LevelMode);
     }
 
     private static string Sanitize(string? value, string fallback)

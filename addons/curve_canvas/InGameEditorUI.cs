@@ -59,7 +59,6 @@ public partial class InGameEditorUI : CanvasLayer
     private Button? _stopPlaytestButton;
     private Button? _exitButton;
     private OptionButton? _segmentTypeOption;
-    private OptionButton? _playModeOption;
     private Label? _activeFileLabel;
     private HBoxContainer? _modeButtonsContainer;
     private ButtonGroup? _modeButtonGroup;
@@ -555,7 +554,8 @@ public partial class InGameEditorUI : CanvasLayer
         {
             LevelName = panel.LevelName,
             Author = panel.Author,
-            ParTimeSeconds = panel.ParTimeSeconds
+            ParTimeSeconds = panel.ParTimeSeconds,
+            LevelMode = panel.LevelMode
         };
     }
 
@@ -686,6 +686,8 @@ public partial class InGameEditorUI : CanvasLayer
         {
             return;
         }
+
+        _useEndlessPlaytest = IsEndlessLevel();
 
         if (!CapturePlaytestSnapshot())
         {
@@ -1095,7 +1097,6 @@ public partial class InGameEditorUI : CanvasLayer
         }
 
         EnsureSegmentTypeOption();
-        EnsurePlayModeOption();
         EnsurePlaytestButtons();
         EnsureExitButton();
 
@@ -1133,25 +1134,6 @@ public partial class InGameEditorUI : CanvasLayer
         UpdateSegmentTypeOption();
     }
 
-    private void EnsurePlayModeOption()
-    {
-        if (_playModeOption == null)
-        {
-            _playModeOption = new OptionButton
-            {
-                Name = "PlayModeDropdown",
-                FocusMode = Control.FocusModeEnum.None,
-                TooltipText = "Choose between finite or endless playtests"
-            };
-            _playModeOption.AddItem("Finite Mode", 0);
-            _playModeOption.AddItem("Endless Mode", 1);
-            _toolbar?.AddChild(_playModeOption);
-        }
-
-        _playModeOption.ItemSelected -= OnPlayModeOptionSelected;
-        _playModeOption.ItemSelected += OnPlayModeOptionSelected;
-        _playModeOption.Select(_useEndlessPlaytest ? 1 : 0);
-    }
 
     private void UpdateSegmentTypeOption()
     {
@@ -1176,10 +1158,12 @@ public partial class InGameEditorUI : CanvasLayer
         _primaryTrackGenerator.SetSegmentType(nextType);
     }
 
-    private void OnPlayModeOptionSelected(long index)
+    private bool IsEndlessLevel()
     {
-        _useEndlessPlaytest = index == 1;
+        var mode = _metadataPanel?.LevelMode ?? "Finite";
+        return mode.Equals("Endless", StringComparison.OrdinalIgnoreCase);
     }
+
 
     private void EnsurePlaytestButtons()
     {

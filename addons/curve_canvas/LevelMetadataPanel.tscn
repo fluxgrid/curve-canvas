@@ -8,6 +8,7 @@ layer = 10
 LevelNameInputPath = NodePath("MarginContainer/PanelContainer/VBoxContainer/LevelNameRow/LevelNameInput")
 AuthorInputPath = NodePath("MarginContainer/PanelContainer/VBoxContainer/AuthorRow/AuthorInput")
 ParTimeInputPath = NodePath("MarginContainer/PanelContainer/VBoxContainer/ParTimeRow/ParTimeInput")
+LevelModeOptionPath = NodePath("MarginContainer/PanelContainer/VBoxContainer/LevelModeRow/LevelModeOption")
 
 [node name="MarginContainer" type="MarginContainer" parent="."]
 anchor_left = 1.0
@@ -78,3 +79,15 @@ step = 1.0
 value = 60.0
 allow_greater = true
 suffix = "s"
+
+[node name="LevelModeRow" type="HBoxContainer" parent="MarginContainer/PanelContainer/VBoxContainer"]
+size_flags_horizontal = 3
+theme_override_constants/separation = 8
+
+[node name="LevelModeLabel" type="Label" parent="MarginContainer/PanelContainer/VBoxContainer/LevelModeRow"]
+text = "Level Type"
+size_flags_horizontal = 1
+
+[node name="LevelModeOption" type="OptionButton" parent="MarginContainer/PanelContainer/VBoxContainer/LevelModeRow"]
+size_flags_horizontal = 3
+focus_mode = 0

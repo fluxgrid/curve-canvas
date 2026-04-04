@@ -38,6 +38,7 @@ public sealed class CurveCanvasMetadata
     public string LevelName { get; set; } = "Untitled Track";
     public string Author { get; set; } = "Anonymous";
     public float ParTimeSeconds { get; set; } = 60f;
+    public string LevelMode { get; set; } = "Finite";
 }
 
 public sealed class CameraTriggerData

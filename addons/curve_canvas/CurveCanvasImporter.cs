@@ -200,7 +200,7 @@ public static class CurveCanvasImporter
         var levelName = string.IsNullOrWhiteSpace(metadata.LevelName) ? metadata.SceneName : metadata.LevelName;
         var author = string.IsNullOrWhiteSpace(metadata.Author) ? "Anonymous" : metadata.Author;
         var parTime = metadata.ParTimeSeconds <= 0f ? 60f : metadata.ParTimeSeconds;
-        metadataPanel.ApplyMetadata(levelName, author, parTime);
+        metadataPanel.ApplyMetadata(levelName, author, parTime, metadata.LevelMode);
     }
 
     private static CurveCanvasExportData? DeserializeCanvasData(string json)

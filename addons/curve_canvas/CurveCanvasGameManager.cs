@@ -252,7 +252,8 @@ public partial class CurveCanvasGameManager : Node
         {
             LevelName = panel.LevelName,
             Author = panel.Author,
-            ParTimeSeconds = panel.ParTimeSeconds
+            ParTimeSeconds = panel.ParTimeSeconds,
+            LevelMode = panel.LevelMode
         };
     }
 }
