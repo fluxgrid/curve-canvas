@@ -623,9 +623,16 @@ public partial class InGameEditorUI : CanvasLayer
             {
                 Name = "ExitToMenuButton",
                 Text = "Exit to Menu",
-                FocusMode = Control.FocusModeEnum.None
+                FocusMode = Control.FocusModeEnum.None,
+                CustomMinimumSize = new Vector2(140f, 0f)
             };
             _toolbar?.AddChild(_exitButton);
+        }
+
+        // Keep the exit button pinned to the left edge so it never gets clipped
+        if (_toolbar != null && _exitButton.GetParent() == _toolbar)
+        {
+            _toolbar.MoveChild(_exitButton, 0);
         }
 
         _exitButton.Pressed -= OnExitToMenuPressed;
