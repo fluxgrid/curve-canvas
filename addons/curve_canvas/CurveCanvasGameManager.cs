@@ -32,7 +32,7 @@ public partial class CurveCanvasGameManager : Node
     public NodePath TrackGeneratorPath { get; set; } = new("../TrackGenerator");
 
     [Export(PropertyHint.GlobalFile, "*.curvecanvas.json")]
-    public string StartupLevelPath { get; set; } = "user://default_level.curvecanvas.json";
+    public string StartupLevelPath { get; set; } = "user://Levels/default_level.curvecanvas.json";
 
     [Export]
     public Godot.Collections.Array<PackedScene> AvailableProps { get; set; } = new();

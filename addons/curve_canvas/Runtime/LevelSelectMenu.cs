@@ -11,12 +11,13 @@ public partial class LevelSelectMenu : Control
     public string DemoScenePath { get; set; } = "res://scenes/CurveCanvasDemo.tscn";
 
     [Export]
-    public Array<string> SearchDirectories { get; set; } = new() { "user://", "res://Exports" };
+    public Array<string> SearchDirectories { get; set; } = new() { "user://Levels/" };
 
     private VBoxContainer? _listContainer;
 
     public override void _Ready()
     {
+        EnsureBaseDirectories();
         _listContainer = GetNodeOrNull<VBoxContainer>("MarginContainer/ScrollContainer/LevelList");
         PopulateButtons();
     }
@@ -131,5 +132,24 @@ public partial class LevelSelectMenu : Control
         }
 
         return trimmed;
+    }
+
+    private void EnsureBaseDirectories()
+    {
+        foreach (var rawDir in SearchDirectories)
+        {
+            var normalized = NormalizeVirtualPath(rawDir ?? string.Empty);
+            if (string.IsNullOrWhiteSpace(normalized))
+            {
+                continue;
+            }
+
+            var global = ProjectSettings.GlobalizePath(normalized);
+            var error = DirAccess.MakeDirRecursiveAbsolute(global);
+            if (error != Error.Ok && error != Error.AlreadyExists)
+            {
+                GD.PushWarning($"[LevelSelectMenu] Could not create '{normalized}': {error}");
+            }
+        }
     }
 }

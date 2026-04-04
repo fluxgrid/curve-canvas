@@ -44,7 +44,7 @@ metadata/_custom_type_script = "uid://dscq3txfdcnmu"
 
 [sub_resource type="Resource" id="AuthoredChunk_Default"]
 script = ExtResource("16_chunkdef")
-JsonFilePath = "user://default_level.curvecanvas.json"
+JsonFilePath = "user://Levels/default_level.curvecanvas.json"
 SegmentType = "Flow"
 RequiredEntrySpeed = "Any"
 ExitSpeed = "Any"
@@ -120,7 +120,7 @@ AvailableChunks = [SubResource("AuthoredChunk_Default")]
 process_mode = 4
 script = ExtResource("13_finite")
 TrackGeneratorPath = NodePath("../TrackGenerator")
-LevelFilePath = "user://default_level.curvecanvas.json"
+LevelFilePath = "user://Levels/default_level.curvecanvas.json"
 PlayerScene = ExtResource("17_player")
 
 [node name="EndlessLevelDirector" type="Node" parent="."]

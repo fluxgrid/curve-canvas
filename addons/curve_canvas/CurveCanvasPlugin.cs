@@ -164,7 +164,7 @@ public partial class CurveCanvasPlugin : EditorPlugin
         var startupPath = _cachedManager?.StartupLevelPath;
         if (string.IsNullOrWhiteSpace(startupPath))
         {
-            startupPath = "user://default_level.curvecanvas.json";
+            startupPath = "user://Levels/default_level.curvecanvas.json";
         }
 
         var absolutePath = ProjectSettings.GlobalizePath(startupPath);

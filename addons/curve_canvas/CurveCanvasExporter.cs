@@ -12,7 +12,7 @@ namespace CurveCanvas.Editor;
 /// </summary>
 public static class CurveCanvasExporter
 {
-    private const string ExportFolder = "res://Exports";
+    private const string ExportFolder = "user://Levels";
     private const string FileExtension = ".curvecanvas.json";
 
     public static bool SaveCanvas(Node sceneRoot, string? exportPath = null, CurveCanvasMetadata? metadataOverrides = null)
