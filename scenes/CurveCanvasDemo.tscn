@@ -5,6 +5,7 @@
 [ext_resource type="Script" uid="uid://cflown0wx0sco" path="res://addons/curve_canvas/CurveCanvasStateManager.cs" id="3_5qc33"]
 [ext_resource type="PackedScene" uid="uid://l4vqhfivlnn3" path="res://addons/curve_canvas/LevelMetadataPanel.tscn" id="4_jm6xb"]
 [ext_resource type="PackedScene" uid="uid://dbh3b884lwvjo" path="res://addons/curve_canvas/InGameEditorUI.tscn" id="5_cbfy8"]
+[ext_resource type="PackedScene" path="res://addons/curve_canvas/SegmentPropertiesPanel.tscn" id="10_segprops"]
 [ext_resource type="Script" path="res://addons/curve_canvas/SequenceVisualizer.cs" id="6_viz"]
 [ext_resource type="PackedScene" path="res://addons/curve_canvas/SequenceEditorPanel.tscn" id="7_seqpanel"]
 [ext_resource type="Script" uid="uid://bmey800w4mahx" path="res://addons/curve_canvas/RuntimeSplineHandles.cs" id="6_n9p2u"]
@@ -95,6 +96,9 @@ visible = false
 [node name="LevelMetadataPanel" parent="." unique_id=950203562 groups=["CurveCanvasLevelMetadata"] instance=ExtResource("4_jm6xb")]
 offset = Vector2(0, 40)
 transform = Transform2D(1, 0, 0, 1, 0, 40)
+
+[node name="SegmentPropertiesPanel" parent="." instance=ExtResource("10_segprops")]
+TrackGeneratorPath = NodePath("../TrackGenerator")
 
 [node name="InGameEditorUI" parent="." unique_id=1382914013 instance=ExtResource("5_cbfy8")]
 SequenceEditorPanelPath = NodePath("SequenceEditorPanel")

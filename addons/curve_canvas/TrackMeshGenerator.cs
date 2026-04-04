@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using CurveCanvas.Editor;
 using Godot;
+using Godot.Collections;
 
 [Tool]
 public partial class TrackMeshGenerator : Path3D
@@ -10,16 +11,22 @@ public partial class TrackMeshGenerator : Path3D
     [Export] public float TrackWidth { get; set; } = 6.0f;
     [Export] public float TextureScale { get; set; } = 1.0f;
 
-    [ExportGroup("Track Surfacing")]
-    [Export] public Material? HighGripMaterial { get; set; }
+    [ExportGroup("Segment Metadata")]
+    [Export] public Dictionary SegmentMetadata { get; set; } = new();
 
-    [Export] public Material? IceMaterial { get; set; }
+    [ExportGroup("Segment Profiles")]
+    [Export] public Material? FlowMaterial { get; set; }
 
-    [Export(PropertyHint.Range, "0,5,0.01")]
-    public float HighGripSlopeThreshold { get; set; } = 0.25f;
+    [Export] public Material? RailMaterial { get; set; }
 
-    [Export(PropertyHint.Range, "0,5,0.01")]
-    public float IceSlopeThreshold { get; set; } = 0.5f;
+    [Export(PropertyHint.Range, "-200,0,0.5")]
+    public float FlowBottomY { get; set; } = -50.0f;
+
+    [Export(PropertyHint.Range, "0.05,10,0.05")]
+    public float RailThickness { get; set; } = 0.6f;
+
+    [Export(PropertyHint.Range, "0.05,10,0.05")]
+    public float RailHeight { get; set; } = 0.25f;
 
     [ExportGroup("Prop Brush Config")]
     [Export]
@@ -43,6 +50,8 @@ public partial class TrackMeshGenerator : Path3D
     [Export]
     public ulong PropBrushNoiseSeed { get; set; } = 1337;
 
+    public string CurrentSegmentType => ResolveSegmentType();
+
     private MeshInstance3D? _meshInstance;
     private StaticBody3D? _collisionBody;
     private CollisionShape3D? _collisionShape;
@@ -52,10 +61,12 @@ public partial class TrackMeshGenerator : Path3D
     private MeshBuildResult? _pendingResult;
     private readonly object _resultLock = new();
 
-    private enum SurfaceCategory
+    public void SetSegmentType(string? segmentType)
     {
-        HighGrip,
-        Ice
+        var type = string.IsNullOrWhiteSpace(segmentType) ? "Flow" : segmentType!;
+        EnsureSegmentMetadataDefaults();
+        SegmentMetadata["SegmentType"] = type;
+        GenerateTrackMesh();
     }
 
     private const string TrackMeshNodeName = "TrackMesh";
@@ -68,6 +79,7 @@ public partial class TrackMeshGenerator : Path3D
     {
         EnsureMeshInstance();
         EnsureCollisionNodes();
+        EnsureSegmentMetadataDefaults();
         if (Curve != null)
         {
             Curve.Changed += OnCurveChanged;
@@ -149,6 +161,27 @@ public partial class TrackMeshGenerator : Path3D
         }
     }
 
+    private void EnsureSegmentMetadataDefaults()
+    {
+        SegmentMetadata ??= new Dictionary();
+        if (!SegmentMetadata.ContainsKey("SegmentType"))
+        {
+            SegmentMetadata["SegmentType"] = "Flow";
+        }
+    }
+
+    private string ResolveSegmentType()
+    {
+        EnsureSegmentMetadataDefaults();
+        var value = SegmentMetadata["SegmentType"];
+        return value.VariantType switch
+        {
+            Variant.Type.StringName => value.AsStringName().ToString(),
+            Variant.Type.String => value.AsString(),
+            _ => value.ToString() ?? "Flow"
+        };
+    }
+
     private void ApplyEditorOwnership(Node node)
     {
         if (!Engine.IsEditorHint() || !IsInsideTree())
@@ -198,20 +231,13 @@ public partial class TrackMeshGenerator : Path3D
             return;
         }
 
-        var settings = new MeshBuildSettings(
-            TrackWidth,
-            TextureScale,
-            HighGripSlopeThreshold,
-            IceSlopeThreshold
-        );
-
         _isRebuilding = true;
 
         Task.Run(() =>
         {
             try
             {
-                var result = BuildMeshData(bakedPoints, settings);
+                var result = BuildMeshData(bakedPoints);
                 lock (_resultLock)
                 {
                     _pendingResult = result;
@@ -243,6 +269,12 @@ public partial class TrackMeshGenerator : Path3D
         {
             _collisionShape.Shape = null;
         }
+    }
+
+    private Material? GetActiveMaterial()
+    {
+        var isRail = CurrentSegmentType.Equals("Rail", StringComparison.OrdinalIgnoreCase);
+        return isRail ? (RailMaterial ?? FlowMaterial) : (FlowMaterial ?? RailMaterial);
     }
 
     private void ApplyPendingMeshResult()
@@ -288,18 +320,16 @@ public partial class TrackMeshGenerator : Path3D
             return;
         }
 
-        if (!result.HasGeometry)
+        if (!result.VisualSurface.HasData)
         {
-            ClearOutputs();
-            return;
+            _meshInstance.Mesh = null;
         }
-
-        var mesh = new ArrayMesh();
-        var hasSurface = false;
-        hasSurface |= AddSurface(mesh, result.HighGripSurface, HighGripMaterial ?? IceMaterial);
-        hasSurface |= AddSurface(mesh, result.IceSurface, IceMaterial ?? HighGripMaterial);
-
-        _meshInstance.Mesh = hasSurface ? mesh : null;
+        else
+        {
+            var mesh = new ArrayMesh();
+            AddSurface(mesh, result.VisualSurface, GetActiveMaterial());
+            _meshInstance.Mesh = mesh;
+        }
 
         if (_collisionShape != null)
         {
@@ -342,10 +372,22 @@ public partial class TrackMeshGenerator : Path3D
         return true;
     }
 
-    private static MeshBuildResult BuildMeshData(Vector3[] bakedPoints, MeshBuildSettings settings)
+    private MeshBuildResult BuildMeshData(Vector3[] bakedPoints)
+    {
+        var flattened = FlattenBakedPoints(bakedPoints, out var vCoordinates);
+        var collider = BuildColliderTriangleStrip(flattened);
+
+        var surface = CurrentSegmentType.Equals("Rail", StringComparison.OrdinalIgnoreCase)
+            ? BuildRailSurface(flattened, vCoordinates)
+            : BuildFlowSurface(flattened, vCoordinates);
+
+        return new MeshBuildResult(surface, collider);
+    }
+
+    private Vector3[] FlattenBakedPoints(Vector3[] bakedPoints, out float[] vCoordinates)
     {
         var flattened = new Vector3[bakedPoints.Length];
-        var vCoordinates = new float[bakedPoints.Length];
+        vCoordinates = new float[bakedPoints.Length];
         var cumulativeDistance = 0f;
 
         for (var i = 0; i < bakedPoints.Length; i++)
@@ -359,41 +401,81 @@ public partial class TrackMeshGenerator : Path3D
             }
 
             flattened[i] = flattenedPoint;
-            vCoordinates[i] = settings.TextureScale > 0f ? cumulativeDistance / settings.TextureScale : 0f;
+            vCoordinates[i] = TextureScale > 0f ? cumulativeDistance / TextureScale : 0f;
         }
 
-        var slopes = ComputeSegmentSlopes(bakedPoints);
-        var highGripAccumulator = new SurfaceAccumulator();
-        var iceAccumulator = new SurfaceAccumulator();
-        var collider = new List<Vector3>(Math.Max(0, (bakedPoints.Length - 1) * 6));
-        var halfWidth = settings.TrackWidth * 0.5f;
+        return flattened;
+    }
 
-        for (var i = 0; i < bakedPoints.Length - 1; i++)
+    private SurfaceMeshData BuildFlowSurface(Vector3[] flattenedPoints, float[] vCoordinates)
+    {
+        var accumulator = new SurfaceAccumulator();
+        for (var i = 0; i < flattenedPoints.Length - 1; i++)
         {
-            var start = flattened[i];
-            var end = flattened[i + 1];
-            var startPoint = new Vector3(start.X, start.Y, 0f);
-            var endPoint = new Vector3(end.X, end.Y, 0f);
+            var start = flattenedPoints[i];
+            var end = flattenedPoints[i + 1];
+            var startTop = new Vector3(start.X, start.Y, 0f);
+            var endTop = new Vector3(end.X, end.Y, 0f);
+            var startBottom = new Vector3(start.X, FlowBottomY, 0f);
+            var endBottom = new Vector3(end.X, FlowBottomY, 0f);
+            accumulator.AppendQuad(startTop, startBottom, endTop, endBottom, 0f, 1f, vCoordinates[i], vCoordinates[i + 1]);
+        }
+
+        return accumulator.ToSurfaceData();
+    }
+
+    private SurfaceMeshData BuildRailSurface(Vector3[] flattenedPoints, float[] vCoordinates)
+    {
+        var accumulator = new SurfaceAccumulator();
+        var halfWidth = Mathf.Max(0.05f, RailThickness * 0.5f);
+        var halfHeight = Mathf.Max(0.05f, RailHeight * 0.5f);
+
+        for (var i = 0; i < flattenedPoints.Length - 1; i++)
+        {
+            var start = flattenedPoints[i];
+            var end = flattenedPoints[i + 1];
+            var startTopLeft = new Vector3(start.X, start.Y + halfHeight, -halfWidth);
+            var startTopRight = new Vector3(start.X, start.Y + halfHeight, halfWidth);
+            var endTopLeft = new Vector3(end.X, end.Y + halfHeight, -halfWidth);
+            var endTopRight = new Vector3(end.X, end.Y + halfHeight, halfWidth);
+
+            var startBottomLeft = new Vector3(start.X, start.Y - halfHeight, -halfWidth);
+            var startBottomRight = new Vector3(start.X, start.Y - halfHeight, halfWidth);
+            var endBottomLeft = new Vector3(end.X, end.Y - halfHeight, -halfWidth);
+            var endBottomRight = new Vector3(end.X, end.Y - halfHeight, halfWidth);
+
             var startV = vCoordinates[i];
             var endV = vCoordinates[i + 1];
 
-            var startLeft = new Vector3(startPoint.X, startPoint.Y, -halfWidth);
-            var startRight = new Vector3(startPoint.X, startPoint.Y, halfWidth);
-            var endLeft = new Vector3(endPoint.X, endPoint.Y, -halfWidth);
-            var endRight = new Vector3(endPoint.X, endPoint.Y, halfWidth);
+            // top
+            accumulator.AppendQuad(startTopLeft, startTopRight, endTopLeft, endTopRight, 0f, 1f, startV, endV);
+            // bottom
+            accumulator.AppendQuad(startBottomRight, startBottomLeft, endBottomRight, endBottomLeft, 0f, 1f, startV, endV);
+            // left side
+            accumulator.AppendQuad(startTopLeft, startBottomLeft, endTopLeft, endBottomLeft, 0f, 1f, startV, endV);
+            // right side
+            accumulator.AppendQuad(startBottomRight, startTopRight, endBottomRight, endTopRight, 0f, 1f, startV, endV);
+        }
 
-            var category = ClassifySurface(slopes[i], settings.HighGripThreshold, settings.IceThreshold);
-            var accumulator = category == SurfaceCategory.Ice ? iceAccumulator : highGripAccumulator;
-            accumulator.AppendQuad(startLeft, startRight, endLeft, endRight, startV, endV);
+        return accumulator.ToSurfaceData();
+    }
 
+    private Vector3[] BuildColliderTriangleStrip(IReadOnlyList<Vector3> flattenedPoints)
+    {
+        var collider = new List<Vector3>(Math.Max(0, (flattenedPoints.Count - 1) * 6));
+        var halfWidth = TrackWidth * 0.5f;
+        for (var i = 0; i < flattenedPoints.Count - 1; i++)
+        {
+            var start = flattenedPoints[i];
+            var end = flattenedPoints[i + 1];
+            var startLeft = new Vector3(start.X, start.Y, -halfWidth);
+            var startRight = new Vector3(start.X, start.Y, halfWidth);
+            var endLeft = new Vector3(end.X, end.Y, -halfWidth);
+            var endRight = new Vector3(end.X, end.Y, halfWidth);
             AppendColliderTriangles(collider, startLeft, startRight, endLeft, endRight);
         }
 
-        return new MeshBuildResult(
-            highGripAccumulator.ToSurfaceData(),
-            iceAccumulator.ToSurfaceData(),
-            collider.ToArray()
-        );
+        return collider.ToArray();
     }
 
     private static void AppendColliderTriangles(List<Vector3> collider, Vector3 startLeft, Vector3 startRight, Vector3 endLeft, Vector3 endRight)
@@ -407,49 +489,6 @@ public partial class TrackMeshGenerator : Path3D
         collider.Add(endLeft);
     }
 
-    private static float[] ComputeSegmentSlopes(IReadOnlyList<Vector3> bakedPoints)
-    {
-        var segmentCount = bakedPoints.Count - 1;
-        var slopes = new float[Math.Max(segmentCount, 0)];
-        for (var i = 0; i < segmentCount; i++)
-        {
-            slopes[i] = CalculateSlopeMagnitude(bakedPoints[i], bakedPoints[i + 1]);
-        }
-
-        return slopes;
-    }
-
-    private static float CalculateSlopeMagnitude(Vector3 start, Vector3 end)
-    {
-        var delta = end - start;
-        var planarLength = Mathf.Abs(delta.X);
-        if (Mathf.IsZeroApprox(planarLength))
-        {
-            return 0f;
-        }
-
-        return Mathf.Abs(delta.Y) / planarLength;
-    }
-
-    private static SurfaceCategory ClassifySurface(float slope, float highGripThreshold, float iceThreshold)
-    {
-        var steepThreshold = Mathf.Max(iceThreshold, highGripThreshold);
-        var gripThreshold = Mathf.Min(highGripThreshold, steepThreshold);
-
-        if (slope >= steepThreshold)
-        {
-            return SurfaceCategory.Ice;
-        }
-
-        if (slope <= gripThreshold)
-        {
-            return SurfaceCategory.HighGrip;
-        }
-
-        var midpoint = (steepThreshold + gripThreshold) * 0.5f;
-        return slope >= midpoint ? SurfaceCategory.Ice : SurfaceCategory.HighGrip;
-    }
-
     private sealed class SurfaceAccumulator
     {
         private readonly List<Vector3> _vertices = new();
@@ -457,21 +496,21 @@ public partial class TrackMeshGenerator : Path3D
         private readonly List<Vector2> _uvs = new();
         private readonly List<int> _indices = new();
 
-        public void AppendQuad(Vector3 startLeft, Vector3 startRight, Vector3 endLeft, Vector3 endRight, float startV, float endV)
+        public void AppendQuad(Vector3 v0, Vector3 v1, Vector3 v2, Vector3 v3, float startU, float endU, float startV, float endV)
         {
             var baseIndex = _vertices.Count;
 
-            _vertices.Add(startLeft);
-            _vertices.Add(startRight);
-            _vertices.Add(endLeft);
-            _vertices.Add(endRight);
+            _vertices.Add(v0);
+            _vertices.Add(v1);
+            _vertices.Add(v2);
+            _vertices.Add(v3);
 
-            _uvs.Add(new Vector2(0f, startV));
-            _uvs.Add(new Vector2(1f, startV));
-            _uvs.Add(new Vector2(0f, endV));
-            _uvs.Add(new Vector2(1f, endV));
+            _uvs.Add(new Vector2(startU, startV));
+            _uvs.Add(new Vector2(endU, startV));
+            _uvs.Add(new Vector2(startU, endV));
+            _uvs.Add(new Vector2(endU, endV));
 
-            var normal = CalculateQuadNormal(startLeft, startRight, endLeft);
+            var normal = CalculateQuadNormal(v0, v1, v2);
             _normals.Add(normal);
             _normals.Add(normal);
             _normals.Add(normal);
@@ -496,10 +535,10 @@ public partial class TrackMeshGenerator : Path3D
         }
     }
 
-    private static Vector3 CalculateQuadNormal(Vector3 startLeft, Vector3 startRight, Vector3 endLeft)
+    private static Vector3 CalculateQuadNormal(Vector3 v0, Vector3 v1, Vector3 v2)
     {
-        var edge1 = startRight - startLeft;
-        var edge2 = endLeft - startLeft;
+        var edge1 = v1 - v0;
+        var edge2 = v2 - v0;
         var normal = edge1.Cross(edge2);
         if (normal.LengthSquared() <= Mathf.Epsilon)
         {
@@ -509,27 +548,16 @@ public partial class TrackMeshGenerator : Path3D
         return normal.Normalized();
     }
 
-    private readonly record struct MeshBuildSettings(
-        float TrackWidth,
-        float TextureScale,
-        float HighGripThreshold,
-        float IceThreshold
-    );
-
     private sealed class MeshBuildResult
     {
-        public MeshBuildResult(SurfaceMeshData highGripSurface, SurfaceMeshData iceSurface, Vector3[] colliderTriangles)
+        public MeshBuildResult(SurfaceMeshData visualSurface, Vector3[] colliderTriangles)
         {
-            HighGripSurface = highGripSurface;
-            IceSurface = iceSurface;
+            VisualSurface = visualSurface;
             ColliderTriangles = colliderTriangles;
         }
 
-        public SurfaceMeshData HighGripSurface { get; }
-        public SurfaceMeshData IceSurface { get; }
+        public SurfaceMeshData VisualSurface { get; }
         public Vector3[] ColliderTriangles { get; }
-
-        public bool HasGeometry => HighGripSurface.HasData || IceSurface.HasData;
     }
 
     private readonly struct SurfaceMeshData
