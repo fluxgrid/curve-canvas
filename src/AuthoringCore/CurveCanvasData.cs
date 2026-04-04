@@ -13,6 +13,7 @@ public sealed class CurveCanvasExportData
     public List<CurveCanvasActionObject> ActionObjects { get; set; } = new();
     public List<CurveCanvasSceneryObject> SceneryObjects { get; set; } = new();
     public List<CameraTriggerData> CameraTriggers { get; set; } = new();
+    public string SegmentType { get; set; } = "Flow";
 }
 
 public sealed class CurveCanvasSplinePoint

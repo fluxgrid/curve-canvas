@@ -81,6 +81,7 @@ public static class CurveCanvasImporter
         }
         ApplyMetadata(metadataPanel, data.Metadata);
         ApplySpline(rootNode, data.Spline);
+        ApplySegmentType(rootNode, data.SegmentType);
 
         var owner = ResolveOwner(rootNode);
         var container = EnsureTriggerContainer(rootNode, owner);
@@ -171,6 +172,22 @@ public static class CurveCanvasImporter
             var outVec = new Vector3(point.OutX, point.OutY, 0f);
             curve.AddPoint(position, inVec, outVec);
         }
+    }
+
+    private static void ApplySegmentType(Node rootNode, string? segmentType)
+    {
+        if (rootNode == null)
+        {
+            return;
+        }
+
+        var track = CurveCanvasExportCommon.FindTrackGenerator(rootNode);
+        if (track == null)
+        {
+            return;
+        }
+
+        track.SetSegmentType(segmentType);
     }
 
     private static void ApplyMetadata(LevelMetadataPanel? metadataPanel, CurveCanvasMetadata? metadata)

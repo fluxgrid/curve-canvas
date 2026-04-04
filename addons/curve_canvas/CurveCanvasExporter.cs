@@ -91,6 +91,7 @@ public static class CurveCanvasExporter
                 ExportedAtUtc = DateTime.UtcNow.ToString("o"),
                 ToolVersion = ResolveToolVersion()
             },
+            SegmentType = track.CurrentSegmentType,
             Spline = CollectSplinePoints(track),
             ActionObjects = CollectActionObjects(sceneRoot),
             SceneryObjects = CollectSceneryObjects(sceneRoot)
