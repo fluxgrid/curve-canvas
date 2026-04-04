@@ -27,6 +27,15 @@ public partial class InGameEditorUI : CanvasLayer
     [Export]
     public NodePath PrimarySplineHandlesPath { get; set; } = new();
 
+    [Export(PropertyHint.File, "*.tscn")]
+    public string PlaytestCameraScenePath { get; set; } = "res://scenes/PlaytestCamera.tscn";
+
+    [Export]
+    public NodePath FiniteDirectorPath { get; set; } = new("../FiniteLevelDirector");
+
+    [Export]
+    public NodePath EditorCameraPath { get; set; } = new("../ArchitectCamera");
+
     private Control? _uiRoot;
     private HBoxContainer? _toolbar;
     private HBoxContainer? _toolButtonsContainer;
@@ -40,6 +49,8 @@ public partial class InGameEditorUI : CanvasLayer
     private Button? _importButton;
     private Button? _attachPreviewButton;
     private Button? _clearPreviewButton;
+    private Button? _playtestButton;
+    private Button? _stopPlaytestButton;
     private Label? _activeFileLabel;
     private HBoxContainer? _modeButtonsContainer;
     private ButtonGroup? _modeButtonGroup;
@@ -66,9 +77,17 @@ public partial class InGameEditorUI : CanvasLayer
     private SequenceEditorPanel? _sequencePanel;
     private SequenceVisualizer? _sequenceVisualizer;
     private Node3D? _primaryTrackNode;
+    private TrackMeshGenerator? _primaryTrackGenerator;
     private Node3D? _primarySplineHandles;
     private bool _sequenceModeActive;
     private bool _freehandModeActive;
+    private bool _playtestActive;
+    private PackedScene? _playtestCameraScene;
+    private Camera3D? _playtestCameraInstance;
+    private Camera3D? _editorCamera;
+    private FiniteLevelDirector? _finiteDirector;
+    private readonly List<string> _playtestTempFiles = new();
+    private string _playtestSnapshot = string.Empty;
 
     public override void _Ready()
     {
@@ -78,6 +97,7 @@ public partial class InGameEditorUI : CanvasLayer
         InitializeContextMenu();
         InitializeAssetPalette();
         ResolveSequenceComponents();
+        ResolvePlaytestDependencies();
         if (_pendingPaletteProps != null)
         {
             var pending = _pendingPaletteProps;
@@ -581,11 +601,266 @@ public partial class InGameEditorUI : CanvasLayer
         }
     }
 
+    private void OnPlaytestButtonPressed()
+    {
+        EnterPlaytestMode();
+    }
+
+    private void OnStopPlaytestPressed()
+    {
+        ExitPlaytestMode();
+    }
+
     private void UpdatePreviewButtonsState()
     {
         if (_clearPreviewButton != null)
         {
             _clearPreviewButton.Disabled = _previewAttachments.Count == 0;
+        }
+    }
+
+    private void EnterPlaytestMode()
+    {
+        if (_playtestActive)
+        {
+            return;
+        }
+
+        _sceneRoot ??= GetSceneRoot();
+        if (_sceneRoot == null)
+        {
+            return;
+        }
+
+        if (!CapturePlaytestSnapshot())
+        {
+            GD.PushWarning("[InGameEditorUI] Unable to capture playtest snapshot.");
+            return;
+        }
+
+        var runtimePath = BuildRuntimeLevelPath();
+        if (!string.IsNullOrEmpty(runtimePath))
+        {
+            _finiteDirector?.LoadLevel(runtimePath);
+        }
+
+        ToggleEditorVisibility(false);
+
+        _playtestCameraScene ??= ResourceLoader.Load<PackedScene>(PlaytestCameraScenePath);
+        _playtestCameraInstance = _playtestCameraScene?.Instantiate<Camera3D>();
+        if (_playtestCameraInstance != null && _sceneRoot != null)
+        {
+            var spawn = DeterminePlaytestSpawnPosition();
+            _playtestCameraInstance.GlobalPosition = spawn + new Vector3(0f, 8f, 20f);
+            _sceneRoot.AddChild(_playtestCameraInstance);
+            _playtestCameraInstance.Current = true;
+        }
+
+        _playtestActive = true;
+        UpdatePlaytestButtons();
+    }
+
+    private void ExitPlaytestMode()
+    {
+        if (!_playtestActive)
+        {
+            return;
+        }
+
+        if (_playtestCameraInstance != null)
+        {
+            _playtestCameraInstance.QueueFree();
+            _playtestCameraInstance = null;
+        }
+
+        RestorePlaytestSnapshot();
+        CleanupPlaytestTempFiles();
+        ToggleEditorVisibility(true);
+        _playtestActive = false;
+        UpdatePlaytestButtons();
+    }
+
+    private void ToggleEditorVisibility(bool show)
+    {
+        if (show)
+        {
+            if (_uiRoot != null)
+            {
+                _uiRoot.Visible = true;
+            }
+
+            if (_editorCamera != null)
+            {
+                _editorCamera.Visible = true;
+                _editorCamera.Current = true;
+            }
+
+            ApplyEditorMode();
+        }
+        else
+        {
+            if (_uiRoot != null)
+            {
+                _uiRoot.Visible = false;
+            }
+
+            _sequencePanel?.Hide();
+            _sequenceVisualizer?.SetVisualizationEnabled(false);
+            if (_primarySplineHandles != null)
+            {
+                _primarySplineHandles.Visible = false;
+            }
+
+            foreach (var multiplexer in _multiplexers)
+            {
+                multiplexer.SetInteractionEnabled(false);
+            }
+
+            if (_editorCamera != null)
+            {
+                _editorCamera.Current = false;
+                _editorCamera.Visible = false;
+            }
+
+            if (_primaryTrackNode != null)
+            {
+                _primaryTrackNode.Visible = true;
+            }
+        }
+    }
+
+    private bool CapturePlaytestSnapshot()
+    {
+        if (_sceneRoot == null)
+        {
+            return false;
+        }
+
+        var json = CurveCanvasExporter.SerializeCanvasToString(_sceneRoot);
+        if (string.IsNullOrEmpty(json))
+        {
+            return false;
+        }
+
+        _playtestSnapshot = json;
+        return true;
+    }
+
+    private void RestorePlaytestSnapshot()
+    {
+        if (string.IsNullOrEmpty(_playtestSnapshot) || _sceneRoot == null)
+        {
+            return;
+        }
+
+        _triggerPrefab ??= GD.Load<PackedScene>(TriggerPrefabPath);
+        if (_triggerPrefab == null)
+        {
+            return;
+        }
+
+        CurveCanvasImporter.LoadCanvasFromString(_playtestSnapshot, _sceneRoot, _triggerPrefab, null, _metadataPanel);
+        _playtestSnapshot = string.Empty;
+    }
+
+    private string? BuildRuntimeLevelPath()
+    {
+        if (_sequenceModeActive && _sequencePanel != null && _sequencePanel.HasChunks &&
+            _sequencePanel.TryCreateTemporarySequence(out var sequencePath))
+        {
+            _playtestTempFiles.Add(sequencePath);
+            return sequencePath;
+        }
+
+        var chunkPath = CreateTemporaryChunkFromScene();
+        if (!string.IsNullOrEmpty(chunkPath))
+        {
+            _playtestTempFiles.Add(chunkPath);
+        }
+
+        return chunkPath;
+    }
+
+    private string? CreateTemporaryChunkFromScene()
+    {
+        if (_sceneRoot == null)
+        {
+            return null;
+        }
+
+        var json = CurveCanvasExporter.SerializeCanvasToString(_sceneRoot);
+        if (string.IsNullOrEmpty(json))
+        {
+            return null;
+        }
+
+        var tempPath = $"user://.playtest_{Guid.NewGuid():N}.curvecanvas.json";
+        try
+        {
+            using var file = FileAccess.Open(tempPath, FileAccess.ModeFlags.Write);
+            if (file == null)
+            {
+                return null;
+            }
+
+            file.StoreString(json);
+        }
+        catch (Exception ex)
+        {
+            GD.PushError($"[InGameEditorUI] Failed to write playtest chunk: {ex.Message}");
+            return null;
+        }
+
+        return tempPath;
+    }
+
+    private void CleanupPlaytestTempFiles()
+    {
+        foreach (var temp in _playtestTempFiles)
+        {
+            if (string.IsNullOrEmpty(temp))
+            {
+                continue;
+            }
+
+            var global = ProjectSettings.GlobalizePath(temp);
+            if (System.IO.File.Exists(global))
+            {
+                try
+                {
+                    System.IO.File.Delete(global);
+                }
+                catch
+                {
+                    // ignored
+                }
+            }
+        }
+
+        _playtestTempFiles.Clear();
+    }
+
+    private Vector3 DeterminePlaytestSpawnPosition()
+    {
+        var curve = _primaryTrackGenerator?.Curve;
+        if (curve != null && curve.PointCount > 0)
+        {
+            return curve.GetPointPosition(0);
+        }
+
+        return Vector3.Zero;
+    }
+
+    private void UpdatePlaytestButtons()
+    {
+        if (_playtestButton != null)
+        {
+            _playtestButton.Disabled = _playtestActive;
+        }
+
+        if (_stopPlaytestButton != null)
+        {
+            _stopPlaytestButton.Visible = _playtestActive;
         }
     }
 
@@ -719,6 +994,8 @@ public partial class InGameEditorUI : CanvasLayer
             _toolbar?.AddChild(_activeFileLabel);
         }
 
+        EnsurePlaytestButtons();
+
         _saveButton.Pressed -= OnSaveButtonPressed;
         _saveButton.Pressed += OnSaveButtonPressed;
         _exportButton.Pressed -= OnExportButtonPressed;
@@ -731,6 +1008,38 @@ public partial class InGameEditorUI : CanvasLayer
         _clearPreviewButton.Pressed += OnClearPreviewButtonPressed;
         UpdateActiveFileLabel();
         UpdatePreviewButtonsState();
+    }
+
+    private void EnsurePlaytestButtons()
+    {
+        if (_playtestButton == null)
+        {
+            _playtestButton = new Button
+            {
+                Name = "PlaytestButton",
+                Text = "Test Level",
+                FocusMode = Control.FocusModeEnum.None
+            };
+            _toolbar?.AddChild(_playtestButton);
+        }
+
+        if (_stopPlaytestButton == null)
+        {
+            _stopPlaytestButton = new Button
+            {
+                Name = "StopPlaytestButton",
+                Text = "Stop Testing",
+                FocusMode = Control.FocusModeEnum.None,
+                Visible = false
+            };
+            _toolbar?.AddChild(_stopPlaytestButton);
+        }
+
+        _playtestButton!.Pressed -= OnPlaytestButtonPressed;
+        _playtestButton.Pressed += OnPlaytestButtonPressed;
+        _stopPlaytestButton!.Pressed -= OnStopPlaytestPressed;
+        _stopPlaytestButton.Pressed += OnStopPlaytestPressed;
+        UpdatePlaytestButtons();
     }
 
     private static void ConfigureDialog(FileDialog? dialog, FileDialog.FileSelectedEventHandler handler)
@@ -903,11 +1212,33 @@ public partial class InGameEditorUI : CanvasLayer
         }
     }
 
+    private void ResolvePlaytestDependencies()
+    {
+        _playtestCameraScene ??= ResourceLoader.Load<PackedScene>(PlaytestCameraScenePath);
+        if (HasNodePath(FiniteDirectorPath))
+        {
+            _finiteDirector = GetNodeOrNull<FiniteLevelDirector>(FiniteDirectorPath);
+        }
+
+        if (HasNodePath(EditorCameraPath))
+        {
+            _editorCamera = GetNodeOrNull<Camera3D>(EditorCameraPath);
+        }
+    }
+
     private void ResolvePrimaryTrackNodes()
     {
         if (HasNodePath(PrimaryTrackGeneratorPath))
         {
             _primaryTrackNode = GetNodeOrNull<Node3D>(PrimaryTrackGeneratorPath);
+            if (_primaryTrackNode is TrackMeshGenerator generator)
+            {
+                _primaryTrackGenerator = generator;
+            }
+            else
+            {
+                _primaryTrackGenerator = _primaryTrackNode as TrackMeshGenerator;
+            }
         }
 
         if (HasNodePath(PrimarySplineHandlesPath))

@@ -27,41 +27,50 @@ public partial class FiniteLevelDirector : Node
 
     public override void _Ready()
     {
-        CallDeferred(nameof(InitializeLevel));
+        var initialPath = LevelFilePath;
+        if (RuntimeLevelSession.TryConsumePendingLevel(out var pendingPath))
+        {
+            initialPath = pendingPath;
+        }
+
+        if (!string.IsNullOrWhiteSpace(initialPath))
+        {
+            LoadLevel(initialPath);
+        }
     }
 
-    private void InitializeLevel()
+    public void LoadLevel(string levelPath)
     {
-        if (string.IsNullOrWhiteSpace(LevelFilePath))
+        if (string.IsNullOrWhiteSpace(levelPath))
         {
-            GD.PushWarning("[FiniteLevelDirector] LevelFilePath is not set.");
+            GD.PushWarning("[FiniteLevelDirector] Cannot load an empty level path.");
             return;
         }
 
         _trackGenerator = ResolveTrackGenerator();
-        if (_trackGenerator == null)
+        if (_trackGenerator?.Curve == null)
         {
             return;
         }
 
-        var curve = _trackGenerator.Curve ?? new Curve3D();
+        LevelFilePath = levelPath;
+        var curve = _trackGenerator.Curve;
         curve.ClearPoints();
-        _trackGenerator.Curve = curve;
 
         Vector3? startPoint;
         Vector3? endPoint;
-        var lowerPath = LevelFilePath.ToLowerInvariant();
+        var lowerPath = levelPath.ToLowerInvariant();
         if (lowerPath.EndsWith(".curvesequence.json", StringComparison.Ordinal))
         {
-            (startPoint, endPoint) = LoadSequence(levelPath: LevelFilePath, curve);
+            (startPoint, endPoint) = LoadSequence(levelPath: levelPath, curve);
         }
         else if (lowerPath.EndsWith(".curvecanvas.json", StringComparison.Ordinal))
         {
-            (startPoint, endPoint) = LoadSingleChunk(LevelFilePath, curve);
+            (startPoint, endPoint) = LoadSingleChunk(levelPath, curve);
         }
         else
         {
-            GD.PushWarning($"[FiniteLevelDirector] Unsupported file type '{LevelFilePath}'.");
+            GD.PushWarning($"[FiniteLevelDirector] Unsupported file type '{levelPath}'.");
             return;
         }
 
@@ -161,56 +170,60 @@ public partial class FiniteLevelDirector : Node
 
     private void SpawnPlayer(Vector3 position)
     {
-        if (_playerInstance != null)
-        {
-            _playerInstance.GlobalPosition = position;
-            return;
-        }
-
         Node3D node;
-        try
+        if (_playerInstance == null)
         {
-            node = PlayerScene?.Instantiate<Node3D>() ?? new CharacterBody3D();
+            try
+            {
+                node = PlayerScene?.Instantiate<Node3D>() ?? new CharacterBody3D();
+            }
+            catch (Exception ex)
+            {
+                GD.PushError($"[FiniteLevelDirector] PlayerScene instantiation failed: {ex.Message}");
+                node = new CharacterBody3D();
+            }
+
+            if (string.IsNullOrWhiteSpace(node.Name))
+            {
+                node.Name = "PlayerCharacter";
+            }
+
+            AddChild(node, true);
+            _playerInstance = node;
         }
-        catch (Exception ex)
+        else
         {
-            GD.PushError($"[FiniteLevelDirector] PlayerScene instantiation failed: {ex.Message}");
-            node = new CharacterBody3D();
+            node = _playerInstance;
         }
 
-        if (string.IsNullOrWhiteSpace(node.Name))
-        {
-            node.Name = "PlayerCharacter";
-        }
-
-        AddChild(node, true);
         node.GlobalPosition = position;
-        _playerInstance = node;
     }
 
     private void SpawnFinishLine(Vector3 position)
     {
-        if (_finishLine != null)
-        {
-            _finishLine.GlobalPosition = position;
-            return;
-        }
-
         Area3D finish;
-        try
+        if (_finishLine == null)
         {
-            finish = FinishLineScene?.Instantiate<Area3D>() ?? CreateDefaultFinishArea();
+            try
+            {
+                finish = FinishLineScene?.Instantiate<Area3D>() ?? CreateDefaultFinishArea();
+            }
+            catch (Exception ex)
+            {
+                GD.PushError($"[FiniteLevelDirector] FinishLineScene instantiation failed: {ex.Message}");
+                finish = CreateDefaultFinishArea();
+            }
+
+            finish.Name = string.IsNullOrWhiteSpace(finish.Name) ? "FinishLine" : finish.Name;
+            AddChild(finish, true);
+            _finishLine = finish;
         }
-        catch (Exception ex)
+        else
         {
-            GD.PushError($"[FiniteLevelDirector] FinishLineScene instantiation failed: {ex.Message}");
-            finish = CreateDefaultFinishArea();
+            finish = _finishLine;
         }
 
-        finish.Name = string.IsNullOrWhiteSpace(finish.Name) ? "FinishLine" : finish.Name;
-        AddChild(finish, true);
         finish.GlobalPosition = position;
-        _finishLine = finish;
     }
 
     private static Area3D CreateDefaultFinishArea()

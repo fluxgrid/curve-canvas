@@ -1,0 +1,51 @@
+[gd_scene load_steps=3 format=3 uid="uid://levelselectmenu"]
+
+[ext_resource type="Script" path="res://addons/curve_canvas/Runtime/LevelSelectMenu.cs" id="1_lsm"]
+
+[sub_resource type="LabelSettings" id="LabelSettings_menu"]
+font_size = 20
+
+[node name="LevelSelectMenu" type="Control"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_lsm")
+
+[node name="MarginContainer" type="MarginContainer" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 40
+theme_override_constants/margin_top = 40
+theme_override_constants/margin_right = 40
+theme_override_constants/margin_bottom = 40
+
+[node name="Panel" type="Panel" parent="MarginContainer"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="VBox" type="VBoxContainer" parent="MarginContainer/Panel"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 12
+
+[node name="Title" type="Label" parent="MarginContainer/Panel/VBox"]
+text = "Select a Level"
+label_settings = SubResource("LabelSettings_menu")
+horizontal_alignment = 1
+
+[node name="ScrollContainer" type="ScrollContainer" parent="MarginContainer/Panel/VBox"]
+size_flags_vertical = 3
+
+[node name="LevelList" type="VBoxContainer" parent="MarginContainer/Panel/VBox/ScrollContainer"]
+theme_override_constants/separation = 6

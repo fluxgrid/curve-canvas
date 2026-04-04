@@ -1,0 +1,7 @@
+[gd_scene load_steps=2 format=3 uid="uid://playtestcamera"]
+
+[ext_resource type="Script" path="res://addons/curve_canvas/Runtime/FreecamController.cs" id="1_fncam"]
+
+[node name="PlaytestCamera" type="Camera3D"]
+current = true
+script = ExtResource("1_fncam")

@@ -133,6 +133,26 @@ public partial class SequenceEditorPanel : PanelContainer
         _saveSequenceDialog.PopupCenteredRatio();
     }
 
+    public bool TryCreateTemporarySequence(out string path)
+    {
+        path = string.Empty;
+        if (_sequenceData.ChunkPaths.Count == 0)
+        {
+            return false;
+        }
+
+        var tempPath = $"user://.sequence_preview_{Guid.NewGuid():N}.curvesequence.json";
+        if (!CurveSequenceSerializer.Save(tempPath, _sequenceData))
+        {
+            return false;
+        }
+
+        path = tempPath;
+        return true;
+    }
+
+    public bool HasChunks => _sequenceData.ChunkPaths.Count > 0;
+
     private void AddChunk(string path)
     {
         if (string.IsNullOrWhiteSpace(path))

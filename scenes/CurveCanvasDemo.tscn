@@ -142,6 +142,9 @@ SequenceEditorPanelPath = NodePath("SequenceEditorPanel")
 SequenceVisualizerPath = NodePath("../SequenceVisualizer")
 PrimaryTrackGeneratorPath = NodePath("../TrackGenerator")
 PrimarySplineHandlesPath = NodePath("../TrackGenerator/SplineHandles")
+PlaytestCameraScenePath = "res://scenes/PlaytestCamera.tscn"
+FiniteDirectorPath = NodePath("../FiniteLevelDirector")
+EditorCameraPath = NodePath("../ArchitectCamera")
 
 [node name="SequenceEditorPanel" parent="InGameEditorUI" unique_id=1030038991 instance=ExtResource("7_seqpanel")]
 anchors_preset = -1
