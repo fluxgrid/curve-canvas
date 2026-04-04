@@ -414,11 +414,13 @@ public partial class TrackMeshGenerator : Path3D
         {
             var start = flattenedPoints[i];
             var end = flattenedPoints[i + 1];
-            var startTop = new Vector3(start.X, start.Y, 0f);
-            var endTop = new Vector3(end.X, end.Y, 0f);
-            var startBottom = new Vector3(start.X, FlowBottomY, 0f);
-            var endBottom = new Vector3(end.X, FlowBottomY, 0f);
-            accumulator.AppendQuad(startTop, startBottom, endTop, endBottom, 0f, 1f, vCoordinates[i], vCoordinates[i + 1]);
+            var topLeft = new Vector3(start.X, start.Y, 0f);
+            var topRight = new Vector3(end.X, end.Y, 0f);
+            var bottomLeft = new Vector3(start.X, FlowBottomY, 0f);
+            var bottomRight = new Vector3(end.X, FlowBottomY, 0f);
+            var startDistance = vCoordinates[i];
+            var endDistance = vCoordinates[i + 1];
+            accumulator.AppendQuad(topLeft, topRight, bottomLeft, bottomRight, startDistance, endDistance, 0f, 1f);
         }
 
         return accumulator.ToSurfaceData();
