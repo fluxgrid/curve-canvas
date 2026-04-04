@@ -58,6 +58,7 @@ public partial class TrackMeshGenerator : Path3D
     private MeshInstance3D? _meshInstance;
     private StaticBody3D? _collisionBody;
     private CollisionShape3D? _collisionShape;
+    private Curve3D? _registeredCurve;
 
     private bool _isRebuilding;
     private bool _pendingRebuild;
@@ -83,25 +84,38 @@ public partial class TrackMeshGenerator : Path3D
         EnsureMeshInstance();
         EnsureCollisionNodes();
         EnsureSegmentMetadataDefaults();
-        if (Curve != null)
-        {
-            Curve.Changed += OnCurveChanged;
-        }
+        RegisterCurve(Curve);
 
         GenerateTrackMesh();
     }
 
     public override void _ExitTree()
     {
-        if (Curve != null)
-        {
-            Curve.Changed -= OnCurveChanged;
-        }
+        RegisterCurve(null);
     }
 
     private void OnCurveChanged()
     {
         GenerateTrackMesh();
+    }
+
+    private void RegisterCurve(Curve3D? newCurve)
+    {
+        if (_registeredCurve == newCurve)
+        {
+            return;
+        }
+
+        if (_registeredCurve != null)
+        {
+            _registeredCurve.Changed -= OnCurveChanged;
+        }
+
+        _registeredCurve = newCurve;
+        if (_registeredCurve != null)
+        {
+            _registeredCurve.Changed += OnCurveChanged;
+        }
     }
 
     private void EnsureMeshInstance()
@@ -201,6 +215,11 @@ public partial class TrackMeshGenerator : Path3D
 
     private void GenerateTrackMesh()
     {
+        if (Curve != _registeredCurve)
+        {
+            RegisterCurve(Curve);
+        }
+
         EnsureMeshInstance();
         EnsureCollisionNodes();
 
