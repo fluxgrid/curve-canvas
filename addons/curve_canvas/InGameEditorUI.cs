@@ -36,6 +36,9 @@ public partial class InGameEditorUI : CanvasLayer
     [Export]
     public NodePath EditorCameraPath { get; set; } = new("../ArchitectCamera");
 
+    [Export(PropertyHint.File, "*.tscn")]
+    public string LevelSelectScenePath { get; set; } = "res://scenes/LevelSelectMenu.tscn";
+
     private Control? _uiRoot;
     private HBoxContainer? _toolbar;
     private HBoxContainer? _toolButtonsContainer;
@@ -51,6 +54,7 @@ public partial class InGameEditorUI : CanvasLayer
     private Button? _clearPreviewButton;
     private Button? _playtestButton;
     private Button? _stopPlaytestButton;
+    private Button? _exitButton;
     private Label? _activeFileLabel;
     private HBoxContainer? _modeButtonsContainer;
     private ButtonGroup? _modeButtonGroup;
@@ -611,6 +615,30 @@ public partial class InGameEditorUI : CanvasLayer
         ExitPlaytestMode();
     }
 
+    private void EnsureExitButton()
+    {
+        if (_exitButton == null)
+        {
+            _exitButton = new Button
+            {
+                Name = "ExitToMenuButton",
+                Text = "Exit to Menu",
+                FocusMode = Control.FocusModeEnum.None
+            };
+            _toolbar?.AddChild(_exitButton);
+        }
+
+        _exitButton.Pressed -= OnExitToMenuPressed;
+        _exitButton.Pressed += OnExitToMenuPressed;
+    }
+
+    private void OnExitToMenuPressed()
+    {
+        ExitPlaytestMode();
+        RuntimeLevelSession.SetPendingLevel(string.Empty);
+        ChangeSceneTo(LevelSelectScenePath);
+    }
+
     private void UpdatePreviewButtonsState()
     {
         if (_clearPreviewButton != null)
@@ -864,6 +892,26 @@ public partial class InGameEditorUI : CanvasLayer
         }
     }
 
+    private void ChangeSceneTo(string scenePath)
+    {
+        if (string.IsNullOrWhiteSpace(scenePath))
+        {
+            return;
+        }
+
+        var tree = GetTree();
+        if (tree == null)
+        {
+            return;
+        }
+
+        var error = tree.ChangeSceneToFile(scenePath);
+        if (error != Error.Ok)
+        {
+            GD.PushError($"[InGameEditorUI] Failed to change scene to '{scenePath}': {error}");
+        }
+    }
+
     private void EnsureToolButtons()
     {
         _toolButtonGroup ??= new ButtonGroup();
@@ -995,6 +1043,7 @@ public partial class InGameEditorUI : CanvasLayer
         }
 
         EnsurePlaytestButtons();
+        EnsureExitButton();
 
         _saveButton.Pressed -= OnSaveButtonPressed;
         _saveButton.Pressed += OnSaveButtonPressed;

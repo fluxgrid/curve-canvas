@@ -1,10 +1,11 @@
-[gd_scene load_steps=5 format=3 uid="uid://playtestrunner"]
+[gd_scene format=3 uid="uid://deb7c8n06kdub"]
 
 [ext_resource type="Script" uid="uid://dl22bot6fb7ky" path="res://addons/curve_canvas/TrackMeshGenerator.cs" id="1_track"]
 [ext_resource type="Script" path="res://addons/curve_canvas/Runtime/FiniteLevelDirector.cs" id="2_director"]
 [ext_resource type="Material" path="res://materials/FlowTrackMaterial.tres" id="3_flow"]
 [ext_resource type="Material" path="res://materials/RailTrackMaterial.tres" id="4_rail"]
 [ext_resource type="PackedScene" path="res://scenes/PlaytestCamera.tscn" id="5_camera"]
+[ext_resource type="Script" path="res://addons/curve_canvas/Runtime/ReturnToMenuButton.cs" id="6_exit"]
 
 [sub_resource type="Curve3D" id="Curve3D_play"]
 bake_interval = 0.5
@@ -24,3 +25,11 @@ RailMaterial = ExtResource("4_rail")
 script = ExtResource("2_director")
 TrackGeneratorPath = NodePath("../TrackGenerator")
 PlayerScene = ExtResource("5_camera")
+
+[node name="ExitLayer" type="CanvasLayer" parent="."]
+
+[node name="ExitButton" type="Button" parent="ExitLayer"]
+offset_left = 32.0
+offset_top = 32.0
+text = "Exit to Menu"
+script = ExtResource("6_exit")
