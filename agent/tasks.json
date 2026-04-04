@@ -24,5 +24,6 @@
     {"id": 35, "name": "Implement Freehand Spline Drawing tool with distance-based point dropping."},
     {"id": 36, "name": "Implement Visual/Collider separation and dynamic Mesh Profiles for different Segment Types."},
     {"id": 37, "name": "Implement UV Coordinate Generation for Seamless Texture Tiling on the Track Mesh."},
-    {"id": 38, "name": "Fix Flow mesh geometry to drop vertices straight down vertically for a solid terrain profile."}
+    {"id": 38, "name": "Fix Flow mesh geometry to drop vertices straight down vertically for a solid terrain profile."},
+    {"id": 39, "name": "Implement Runtime Level Directors: Finite (Single Map Load) and Endless (Procedural Spawning)."}
 ]
