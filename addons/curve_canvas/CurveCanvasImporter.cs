@@ -222,30 +222,7 @@ public static class CurveCanvasImporter
     public static Godot.Collections.Array<Godot.Collections.Dictionary> ExtractSplineData(string? filePath)
     {
         var points = new Godot.Collections.Array<Godot.Collections.Dictionary>();
-        if (string.IsNullOrWhiteSpace(filePath))
-        {
-            GD.PushError("[CurveCanvasImporter] ExtractSplineData requires a valid file path.");
-            return points;
-        }
-
-        if (!FileAccess.FileExists(filePath))
-        {
-            GD.PushError($"[CurveCanvasImporter] ExtractSplineData could not find '{filePath}'.");
-            return points;
-        }
-
-        string json;
-        try
-        {
-            json = FileAccess.GetFileAsString(filePath);
-        }
-        catch (Exception ex)
-        {
-            GD.PushError($"[CurveCanvasImporter] ExtractSplineData failed to read '{filePath}': {ex.Message}");
-            return points;
-        }
-
-        var data = DeserializeCanvasData(json);
+        var data = LoadExportData(filePath);
         if (data?.Spline == null)
         {
             return points;
@@ -257,6 +234,18 @@ public static class CurveCanvasImporter
         }
 
         return points;
+    }
+
+    public static string ExtractSegmentType(string? filePath)
+    {
+        const string fallback = "Flow";
+        var data = LoadExportData(filePath);
+        if (data == null)
+        {
+            return fallback;
+        }
+
+        return string.IsNullOrWhiteSpace(data.SegmentType) ? fallback : data.SegmentType;
     }
 
     private static Node EnsureTriggerContainer(Node rootNode, Node? owner)
@@ -405,5 +394,39 @@ public static class CurveCanvasImporter
         }
 
         return $"CameraTrigger_{index + 1:D2}";
+    }
+
+    private static CurveCanvasExportData? LoadExportData(string? filePath)
+    {
+        if (string.IsNullOrWhiteSpace(filePath))
+        {
+            GD.PushError("[CurveCanvasImporter] A valid file path is required.");
+            return null;
+        }
+
+        if (!FileAccess.FileExists(filePath))
+        {
+            GD.PushError($"[CurveCanvasImporter] File '{filePath}' was not found.");
+            return null;
+        }
+
+        string json;
+        try
+        {
+            json = FileAccess.GetFileAsString(filePath);
+        }
+        catch (Exception ex)
+        {
+            GD.PushError($"[CurveCanvasImporter] Failed to read '{filePath}': {ex.Message}");
+            return null;
+        }
+
+        var data = DeserializeCanvasData(json);
+        if (data == null)
+        {
+            GD.PushError($"[CurveCanvasImporter] '{filePath}' contained invalid CurveCanvas data.");
+        }
+
+        return data;
     }
 }

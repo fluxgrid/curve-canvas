@@ -1,4 +1,5 @@
 using System;
+using CurveCanvas.AuthoringCore;
 using Godot;
 using Godot.Collections;
 
@@ -86,6 +87,7 @@ public partial class FiniteLevelDirector : Node
 
     private (Vector3? startPoint, Vector3? endPoint) LoadSingleChunk(string filePath, Curve3D curve)
     {
+        ApplySegmentTypeFromChunk(filePath);
         var splinePoints = CurveCanvasImporter.ExtractSplineData(filePath);
         if (splinePoints.Count == 0)
         {
@@ -105,6 +107,7 @@ public partial class FiniteLevelDirector : Node
             return (null, null);
         }
 
+        ApplySegmentTypeFromSequence(data);
         Vector3? globalStart = null;
         Vector3? lastAppended = null;
 
@@ -244,5 +247,43 @@ public partial class FiniteLevelDirector : Node
 
         area.AddChild(collider, true);
         return area;
+    }
+
+    private void ApplySegmentTypeFromChunk(string? chunkPath)
+    {
+        if (_trackGenerator == null)
+        {
+            return;
+        }
+
+        var segmentType = CurveCanvasImporter.ExtractSegmentType(chunkPath);
+        if (!string.IsNullOrWhiteSpace(segmentType))
+        {
+            _trackGenerator.SetSegmentType(segmentType);
+        }
+    }
+
+    private void ApplySegmentTypeFromSequence(CurveSequenceData data)
+    {
+        if (_trackGenerator == null)
+        {
+            return;
+        }
+
+        foreach (var chunkPathVariant in data.ChunkPaths)
+        {
+            var chunkPath = chunkPathVariant?.ToString();
+            if (string.IsNullOrWhiteSpace(chunkPath))
+            {
+                continue;
+            }
+
+            var segmentType = CurveCanvasImporter.ExtractSegmentType(chunkPath);
+            if (!string.IsNullOrWhiteSpace(segmentType))
+            {
+                _trackGenerator.SetSegmentType(segmentType);
+                break;
+            }
+        }
     }
 }
