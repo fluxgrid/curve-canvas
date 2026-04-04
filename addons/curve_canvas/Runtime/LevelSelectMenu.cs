@@ -18,22 +18,16 @@ public partial class LevelSelectMenu : Control
     public override void _Ready()
     {
         EnsureBaseDirectories();
-        _listContainer = GetNodeOrNull<VBoxContainer>("MarginContainer/ScrollContainer/LevelList");
+        _listContainer = GetNodeOrNull<VBoxContainer>("MarginContainer/Panel/VBox/ScrollContainer/LevelList");
         PopulateButtons();
     }
 
     private void PopulateButtons()
     {
-        if (_listContainer == null)
+        EnsureListContainer();
+        foreach (Node child in _listContainer!.GetChildren())
         {
-            _listContainer = new VBoxContainer { Name = "LevelList" };
-        }
-        else
-        {
-            foreach (Node child in _listContainer.GetChildren())
-            {
-                child.QueueFree();
-            }
+            child.QueueFree();
         }
 
         foreach (var rawDir in SearchDirectories)
@@ -150,6 +144,30 @@ public partial class LevelSelectMenu : Control
             {
                 GD.PushWarning($"[LevelSelectMenu] Could not create '{normalized}': {error}");
             }
+        }
+    }
+
+    private void EnsureListContainer()
+    {
+        if (_listContainer != null)
+        {
+            return;
+        }
+
+        var scroll = GetNodeOrNull<ScrollContainer>("MarginContainer/Panel/VBox/ScrollContainer");
+        if (scroll == null)
+        {
+            scroll = new ScrollContainer { Name = "ScrollContainer" };
+            var vbox = GetNodeOrNull<VBoxContainer>("MarginContainer/Panel/VBox");
+            vbox ??= new VBoxContainer { Name = "VBox" };
+            vbox.AddChild(scroll);
+        }
+
+        _listContainer = scroll.GetNodeOrNull<VBoxContainer>("LevelList");
+        if (_listContainer == null)
+        {
+            _listContainer = new VBoxContainer { Name = "LevelList" };
+            scroll.AddChild(_listContainer);
         }
     }
 }
