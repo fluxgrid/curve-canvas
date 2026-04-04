@@ -1,13 +1,16 @@
-[gd_scene format=3 uid="uid://runtimeplayer"]
+[gd_scene format=3]
 
-[node name="RuntimePlayer" type="CharacterBody3D"]
-process_mode = 4
-[node name="Mesh" type="MeshInstance3D" parent="."]
-mesh = CubeMesh {
+[sub_resource type="CubeMesh" id="CubeMesh_body"]
 size = Vector3(1, 2, 1)
-}
-[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
-shape = CapsuleShape3D {
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_body"]
 radius = 0.5
 height = 1.8
-}
+
+[node name="RuntimePlayer" type="CharacterBody3D"]
+
+[node name="Mesh" type="MeshInstance3D" parent="."]
+mesh = SubResource("CubeMesh_body")
+
+[node name="Collider" type="CollisionShape3D" parent="."]
+shape = SubResource("CapsuleShape3D_body")
