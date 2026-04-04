@@ -1,6 +1,7 @@
-using System;
 using Godot;
 using Godot.Collections;
+using System;
+using System.IO;
 
 namespace CurveCanvas.Editor;
 
@@ -42,47 +43,7 @@ public partial class LevelSelectMenu : Control
                 continue;
             }
 
-            try
-            {
-                using var dir = DirAccess.Open(directory);
-                if (dir == null)
-                {
-                    continue;
-                }
-
-                dir.ListDirBegin();
-                while (true)
-                {
-                    var file = dir.GetNext();
-                    if (string.IsNullOrEmpty(file))
-                    {
-                        break;
-                    }
-
-                    if (file == "." || file == "..")
-                    {
-                        continue;
-                    }
-
-                    if (dir.CurrentIsDir())
-                    {
-                        continue;
-                    }
-
-                    if (!file.EndsWith(".curvecanvas.json", StringComparison.OrdinalIgnoreCase) &&
-                        !file.EndsWith(".curvesequence.json", StringComparison.OrdinalIgnoreCase))
-                    {
-                        continue;
-                    }
-
-                    var fullPath = System.IO.Path.Combine(directory, file);
-                    AddLevelButton(fullPath);
-                }
-            }
-            catch (Exception ex)
-            {
-                GD.PushWarning($"[LevelSelectMenu] Failed to enumerate '{directory}': {ex.Message}");
-            }
+            EnumerateDirectory(directory);
         }
 
         if (_listContainer!.GetChildCount() == 0)
@@ -122,5 +83,53 @@ public partial class LevelSelectMenu : Control
         {
             GD.PushError($"[LevelSelectMenu] Failed to load demo scene '{DemoScenePath}': {error}");
         }
+    }
+
+    private void EnumerateDirectory(string virtualPath)
+    {
+        var normalized = NormalizeVirtualPath(virtualPath);
+        var globalPath = ProjectSettings.GlobalizePath(normalized);
+        if (!Directory.Exists(globalPath))
+        {
+            return;
+        }
+
+        try
+        {
+            var files = Directory.GetFiles(globalPath, "*.*", SearchOption.TopDirectoryOnly);
+            foreach (var file in files)
+            {
+                var extension = Path.GetExtension(file);
+                if (!extension.Equals(".json", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                if (!file.EndsWith(".curvecanvas.json", StringComparison.OrdinalIgnoreCase) &&
+                    !file.EndsWith(".curvesequence.json", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                var fileName = Path.GetFileName(file);
+                var virtualFilePath = $"{normalized}{fileName}";
+                AddLevelButton(virtualFilePath);
+            }
+        }
+        catch (Exception ex)
+        {
+            GD.PushWarning($"[LevelSelectMenu] Failed to enumerate '{virtualPath}': {ex.Message}");
+        }
+    }
+
+    private static string NormalizeVirtualPath(string path)
+    {
+        var trimmed = path.Trim();
+        if (!trimmed.EndsWith("/"))
+        {
+            trimmed += "/";
+        }
+
+        return trimmed;
     }
 }
