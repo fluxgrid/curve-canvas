@@ -13,6 +13,9 @@ public partial class FiniteLevelDirector : Node
     public string LevelFilePath { get; set; } = string.Empty;
 
     [Export]
+    public NodePath TrackGeneratorPath { get; set; } = new();
+
+    [Export]
     public PackedScene? PlayerScene { get; set; }
 
     [Export]
@@ -35,7 +38,7 @@ public partial class FiniteLevelDirector : Node
             return;
         }
 
-        _trackGenerator = CreateTrackGenerator();
+        _trackGenerator = ResolveTrackGenerator();
         if (_trackGenerator == null)
         {
             return;
@@ -127,6 +130,21 @@ public partial class FiniteLevelDirector : Node
         }
 
         return (globalStart, lastAppended);
+    }
+
+    private TrackMeshGenerator? ResolveTrackGenerator()
+    {
+        if (!TrackGeneratorPath.IsEmpty)
+        {
+            var existing = GetNodeOrNull<TrackMeshGenerator>(TrackGeneratorPath);
+            if (existing != null)
+            {
+                return existing;
+            }
+            GD.PushWarning($"[FiniteLevelDirector] TrackGeneratorPath '{TrackGeneratorPath}' could not be resolved; creating a runtime instance instead.");
+        }
+
+        return CreateTrackGenerator();
     }
 
     private TrackMeshGenerator CreateTrackGenerator()

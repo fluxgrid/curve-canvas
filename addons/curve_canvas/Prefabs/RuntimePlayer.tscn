@@ -1,0 +1,13 @@
+[gd_scene format=3 uid="uid://runtimeplayer"]
+
+[node name="RuntimePlayer" type="CharacterBody3D"]
+process_mode = 4
+[node name="Mesh" type="MeshInstance3D" parent="."]
+mesh = CubeMesh {
+size = Vector3(1, 2, 1)
+}
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+shape = CapsuleShape3D {
+radius = 0.5
+height = 1.8
+}

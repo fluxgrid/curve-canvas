@@ -14,6 +14,11 @@
 [ext_resource type="PackedScene" uid="uid://b4w30as0pnwjs" path="res://addons/curve_canvas/SegmentPropertiesPanel.tscn" id="10_segprops"]
 [ext_resource type="Material" path="res://materials/FlowTrackMaterial.tres" id="11_flow"]
 [ext_resource type="Material" path="res://materials/RailTrackMaterial.tres" id="12_rail"]
+[ext_resource type="Script" path="res://addons/curve_canvas/Runtime/FiniteLevelDirector.cs" id="13_finite"]
+[ext_resource type="Script" path="res://addons/curve_canvas/Runtime/EndlessLevelDirector.cs" id="14_endless"]
+[ext_resource type="Script" path="res://addons/curve_canvas/Chunks/ChunkLibrary.cs" id="15_chunklib"]
+[ext_resource type="Script" path="res://addons/curve_canvas/Chunks/AuthoredChunkDefinition.cs" id="16_chunkdef"]
+[ext_resource type="PackedScene" path="res://addons/curve_canvas/Prefabs/RuntimePlayer.tscn" id="17_player"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_81nbn"]
 sky_horizon_color = Color(0.66224277, 0.6717428, 0.6867428, 1)
@@ -36,6 +41,13 @@ bake_interval = 0.5
 [sub_resource type="Resource" id="Resource_1vhvs"]
 script = ExtResource("2_g248d")
 metadata/_custom_type_script = "uid://dscq3txfdcnmu"
+
+[sub_resource type="Resource" id="AuthoredChunk_Default"]
+script = ExtResource("16_chunkdef")
+JsonFilePath = "user://default_level.curvecanvas.json"
+SegmentType = "Flow"
+RequiredEntrySpeed = "Any"
+ExitSpeed = "Any"
 
 [node name="CurveCanvasDemo" type="Node3D" unique_id=343262453]
 
@@ -99,6 +111,24 @@ SplineHandlesPath = NodePath("../TrackGenerator/SplineHandles")
 [node name="SequenceVisualizer" type="Node3D" parent="." unique_id=1415155667]
 visible = false
 script = ExtResource("6_viz")
+
+[node name="ChunkLibrary" type="Node" parent="."]
+script = ExtResource("15_chunklib")
+AvailableChunks = [SubResource("AuthoredChunk_Default")]
+
+[node name="FiniteLevelDirector" type="Node" parent="."]
+process_mode = 4
+script = ExtResource("13_finite")
+TrackGeneratorPath = NodePath("../TrackGenerator")
+LevelFilePath = "user://default_level.curvecanvas.json"
+PlayerScene = ExtResource("17_player")
+
+[node name="EndlessLevelDirector" type="Node" parent="."]
+process_mode = 4
+script = ExtResource("14_endless")
+GlobalLibraryPath = NodePath("../ChunkLibrary")
+SpawnLookahead = 150.0
+DespawnDistance = 100.0
 
 [node name="LevelMetadataPanel" parent="." unique_id=950203562 groups=["CurveCanvasLevelMetadata"] instance=ExtResource("4_jm6xb")]
 offset = Vector2(0, 40)
