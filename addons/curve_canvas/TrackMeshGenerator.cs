@@ -11,6 +11,9 @@ public partial class TrackMeshGenerator : Path3D
     [Export] public float TrackWidth { get; set; } = 6.0f;
     [Export] public float TextureScale { get; set; } = 1.0f;
 
+    [Export(PropertyHint.Range, "0.1,1000,0.1")]
+    public float TextureRepeatDistance { get; set; } = 5.0f;
+
     [ExportGroup("Segment Metadata")]
     [Export] public Dictionary SegmentMetadata { get; set; } = new();
 
@@ -384,10 +387,10 @@ public partial class TrackMeshGenerator : Path3D
         return new MeshBuildResult(surface, collider);
     }
 
-    private Vector3[] FlattenBakedPoints(Vector3[] bakedPoints, out float[] vCoordinates)
+    private Vector3[] FlattenBakedPoints(Vector3[] bakedPoints, out float[] cumulativeDistances)
     {
         var flattened = new Vector3[bakedPoints.Length];
-        vCoordinates = new float[bakedPoints.Length];
+        cumulativeDistances = new float[bakedPoints.Length];
         var cumulativeDistance = 0f;
 
         for (var i = 0; i < bakedPoints.Length; i++)
@@ -401,10 +404,17 @@ public partial class TrackMeshGenerator : Path3D
             }
 
             flattened[i] = flattenedPoint;
-            vCoordinates[i] = TextureScale > 0f ? cumulativeDistance / TextureScale : 0f;
+            cumulativeDistances[i] = cumulativeDistance;
         }
 
         return flattened;
+    }
+
+    private float DistanceToRepeatU(float distance)
+    {
+        return TextureRepeatDistance > Mathf.Epsilon
+            ? distance / TextureRepeatDistance
+            : 0f;
     }
 
     private SurfaceMeshData BuildFlowSurface(Vector3[] flattenedPoints, float[] vCoordinates)
@@ -418,6 +428,8 @@ public partial class TrackMeshGenerator : Path3D
             var end = flattenedPoints[i + 1];
             var startDistance = vCoordinates[i];
             var endDistance = vCoordinates[i + 1];
+            var startU = DistanceToRepeatU(startDistance);
+            var endU = DistanceToRepeatU(endDistance);
 
             var startFrontTop = new Vector3(start.X, start.Y, halfWidth);
             var startBackTop = new Vector3(start.X, start.Y, -halfWidth);
@@ -435,8 +447,8 @@ public partial class TrackMeshGenerator : Path3D
                 startFrontTop,
                 endBackTop,
                 endFrontTop,
-                startDistance,
-                endDistance,
+                startU,
+                endU,
                 0f,
                 1f);
 
@@ -446,8 +458,8 @@ public partial class TrackMeshGenerator : Path3D
                 endFrontTop,
                 startFrontBottom,
                 endFrontBottom,
-                startDistance,
-                endDistance,
+                startU,
+                endU,
                 0f,
                 1f);
 
@@ -457,8 +469,8 @@ public partial class TrackMeshGenerator : Path3D
                 startBackTop,
                 endBackBottom,
                 startBackBottom,
-                startDistance,
-                endDistance,
+                startU,
+                endU,
                 0f,
                 1f);
 
@@ -468,8 +480,8 @@ public partial class TrackMeshGenerator : Path3D
                 startBackBottom,
                 endFrontBottom,
                 endBackBottom,
-                startDistance,
-                endDistance,
+                startU,
+                endU,
                 0f,
                 1f);
         }
@@ -497,17 +509,19 @@ public partial class TrackMeshGenerator : Path3D
             var endBottomLeft = new Vector3(end.X, end.Y - halfHeight, -halfWidth);
             var endBottomRight = new Vector3(end.X, end.Y - halfHeight, halfWidth);
 
-            var startV = vCoordinates[i];
-            var endV = vCoordinates[i + 1];
+            var startDistance = vCoordinates[i];
+            var endDistance = vCoordinates[i + 1];
+            var startU = DistanceToRepeatU(startDistance);
+            var endU = DistanceToRepeatU(endDistance);
 
-            // top
-            accumulator.AppendQuad(startTopLeft, startTopRight, endTopLeft, endTopRight, 0f, 1f, startV, endV);
+            // top (width across Z axis)
+            accumulator.AppendQuad(startTopLeft, startTopRight, endTopLeft, endTopRight, startU, endU, 0f, 1f);
             // bottom
-            accumulator.AppendQuad(startBottomRight, startBottomLeft, endBottomRight, endBottomLeft, 0f, 1f, startV, endV);
-            // left side
-            accumulator.AppendQuad(startTopLeft, startBottomLeft, endTopLeft, endBottomLeft, 0f, 1f, startV, endV);
-            // right side
-            accumulator.AppendQuad(startBottomRight, startTopRight, endBottomRight, endTopRight, 0f, 1f, startV, endV);
+            accumulator.AppendQuad(startBottomRight, startBottomLeft, endBottomRight, endBottomLeft, startU, endU, 0f, 1f);
+            // left side (vertical)
+            accumulator.AppendQuad(startTopLeft, startBottomLeft, endTopLeft, endBottomLeft, startU, endU, 0f, 1f);
+            // right side (vertical)
+            accumulator.AppendQuad(startBottomRight, startTopRight, endBottomRight, endTopRight, startU, endU, 0f, 1f);
         }
 
         return accumulator.ToSurfaceData();
