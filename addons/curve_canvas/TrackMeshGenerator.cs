@@ -410,17 +410,68 @@ public partial class TrackMeshGenerator : Path3D
     private SurfaceMeshData BuildFlowSurface(Vector3[] flattenedPoints, float[] vCoordinates)
     {
         var accumulator = new SurfaceAccumulator();
+        var halfWidth = Mathf.Max(0.1f, TrackWidth * 0.5f);
+
         for (var i = 0; i < flattenedPoints.Length - 1; i++)
         {
             var start = flattenedPoints[i];
             var end = flattenedPoints[i + 1];
-            var topLeft = new Vector3(start.X, start.Y, 0f);
-            var topRight = new Vector3(end.X, end.Y, 0f);
-            var bottomLeft = new Vector3(start.X, FlowBottomY, 0f);
-            var bottomRight = new Vector3(end.X, FlowBottomY, 0f);
             var startDistance = vCoordinates[i];
             var endDistance = vCoordinates[i + 1];
-            accumulator.AppendQuad(topLeft, topRight, bottomLeft, bottomRight, startDistance, endDistance, 0f, 1f);
+
+            var startFrontTop = new Vector3(start.X, start.Y, halfWidth);
+            var startBackTop = new Vector3(start.X, start.Y, -halfWidth);
+            var endFrontTop = new Vector3(end.X, end.Y, halfWidth);
+            var endBackTop = new Vector3(end.X, end.Y, -halfWidth);
+
+            var startFrontBottom = new Vector3(start.X, FlowBottomY, halfWidth);
+            var startBackBottom = new Vector3(start.X, FlowBottomY, -halfWidth);
+            var endFrontBottom = new Vector3(end.X, FlowBottomY, halfWidth);
+            var endBackBottom = new Vector3(end.X, FlowBottomY, -halfWidth);
+
+            // top deck that follows the spline profile
+            accumulator.AppendQuad(
+                startBackTop,
+                startFrontTop,
+                endBackTop,
+                endFrontTop,
+                startDistance,
+                endDistance,
+                0f,
+                1f);
+
+            // front wall (positive Z)
+            accumulator.AppendQuad(
+                startFrontTop,
+                endFrontTop,
+                startFrontBottom,
+                endFrontBottom,
+                startDistance,
+                endDistance,
+                0f,
+                1f);
+
+            // back wall (negative Z)
+            accumulator.AppendQuad(
+                endBackTop,
+                startBackTop,
+                endBackBottom,
+                startBackBottom,
+                startDistance,
+                endDistance,
+                0f,
+                1f);
+
+            // bottom face to close off the volume
+            accumulator.AppendQuad(
+                startFrontBottom,
+                startBackBottom,
+                endFrontBottom,
+                endBackBottom,
+                startDistance,
+                endDistance,
+                0f,
+                1f);
         }
 
         return accumulator.ToSurfaceData();
