@@ -21,5 +21,6 @@
     {"id": 31, "name": "Add Smooth and Sharpen (Linear) tangent controls to the Spline Context Menu."},
     {"id": 32, "name": "Implement Sequence Authoring Mode with 3D Spatial Visualization."},
     {"id": 33, "name": "Implement ChunkLibrary, base ChunkDefinition resource, and both Authored and Procedural chunk implementations."},
-    {"id": 35, "name": "Implement Freehand Spline Drawing tool with distance-based point dropping."}
+    {"id": 35, "name": "Implement Freehand Spline Drawing tool with distance-based point dropping."},
+    {"id": 36, "name": "Implement Visual/Collider separation and dynamic Mesh Profiles for different Segment Types."}
 ]
