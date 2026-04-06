@@ -20,6 +20,9 @@ public partial class FiniteLevelDirector : Node
     public NodePath EndlessDirectorPath { get; set; } = new("../EndlessLevelDirector");
 
     [Export]
+    public bool AutoLoadOnReady { get; set; } = true;
+
+    [Export]
     public PackedScene? PlayerScene { get; set; }
 
     [Export]
@@ -38,15 +41,18 @@ public partial class FiniteLevelDirector : Node
             _endlessDirector = GetNodeOrNull<EndlessLevelDirector>(EndlessDirectorPath);
         }
 
-        var initialPath = LevelFilePath;
-        if (RuntimeLevelSession.TryConsumePendingLevel(out var pendingPath))
+        if (AutoLoadOnReady)
         {
-            initialPath = pendingPath;
-        }
+            var initialPath = LevelFilePath;
+            if (RuntimeLevelSession.TryConsumePendingLevel(out var pendingPath))
+            {
+                initialPath = pendingPath;
+            }
 
-        if (!string.IsNullOrWhiteSpace(initialPath))
-        {
-            LoadLevel(initialPath);
+            if (!string.IsNullOrWhiteSpace(initialPath))
+            {
+                LoadLevel(initialPath);
+            }
         }
     }
 

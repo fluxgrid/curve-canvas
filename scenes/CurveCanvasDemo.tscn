@@ -121,6 +121,7 @@ process_mode = 4
 script = ExtResource("13_finite")
 TrackGeneratorPath = NodePath("../TrackGenerator")
 LevelFilePath = "user://Levels/default_level.curvecanvas.json"
+AutoLoadOnReady = false
 PlayerScene = ExtResource("17_player")
 
 [node name="EndlessLevelDirector" type="Node" parent="."]
