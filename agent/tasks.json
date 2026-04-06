@@ -28,5 +28,6 @@
     {"id": 39, "name": "Implement Runtime Level Directors: Finite (Single Map Load) and Endless (Procedural Spawning)."},
     {"id": 40, "name": "Implement Editor Freecam Playtest Mode and Level Select Browser UI."},
     {"id": 41, "name": "Fix Endless Level Routing and Runtime Triggers for Playtest and Standalone modes."},
-    {"id": 42, "name": "Implement Sliding Window (Fill and Prune) in EndlessLevelDirector."}
+    {"id": 42, "name": "Implement Sliding Window (Fill and Prune) in EndlessLevelDirector."},
+    {"id": 43, "name": "Fix backfill math and implement Bidirectional Pruning with a forward history stack."}
 ]
