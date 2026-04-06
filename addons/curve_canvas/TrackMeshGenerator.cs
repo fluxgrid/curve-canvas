@@ -22,8 +22,8 @@ public partial class TrackMeshGenerator : Path3D
 
     [Export] public Material? RailMaterial { get; set; }
 
-    [Export(PropertyHint.Range, "-200,0,0.5")]
-    public float FlowBottomY { get; set; } = -50.0f;
+    [Export(PropertyHint.Range, "0,200,0.5")]
+    public float FlowSkirtDepth { get; set; } = 50.0f;
 
     [Export(PropertyHint.Range, "0.05,10,0.05")]
     public float RailThickness { get; set; } = 0.6f;
@@ -455,10 +455,12 @@ public partial class TrackMeshGenerator : Path3D
             var endFrontTop = new Vector3(end.X, end.Y, halfWidth);
             var endBackTop = new Vector3(end.X, end.Y, -halfWidth);
 
-            var startFrontBottom = new Vector3(start.X, FlowBottomY, halfWidth);
-            var startBackBottom = new Vector3(start.X, FlowBottomY, -halfWidth);
-            var endFrontBottom = new Vector3(end.X, FlowBottomY, halfWidth);
-            var endBackBottom = new Vector3(end.X, FlowBottomY, -halfWidth);
+            var startBottomY = start.Y - FlowSkirtDepth;
+            var endBottomY = end.Y - FlowSkirtDepth;
+            var startFrontBottom = new Vector3(start.X, startBottomY, halfWidth);
+            var startBackBottom = new Vector3(start.X, startBottomY, -halfWidth);
+            var endFrontBottom = new Vector3(end.X, endBottomY, halfWidth);
+            var endBackBottom = new Vector3(end.X, endBottomY, -halfWidth);
 
             // top deck that follows the spline profile
             accumulator.AppendQuad(
