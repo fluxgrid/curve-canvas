@@ -740,6 +740,7 @@ public partial class InGameEditorUI : CanvasLayer
         if (_useEndlessPlaytest)
         {
             _endlessDirector?.ResetStream(Vector3.Zero);
+            _endlessDirector?.ClearManualChunks();
         }
 
         RestorePlaytestSnapshot();

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using CurveCanvas.AuthoringCore;
 using Godot;
 using Godot.Collections;
@@ -74,7 +75,7 @@ public partial class FiniteLevelDirector : Node
         _isEndlessLevel = IsEndlessLevel(levelPath);
         if (_isEndlessLevel)
         {
-            if (TryStartEndlessLevel())
+            if (TryStartEndlessLevel(levelPath))
             {
                 return;
             }
@@ -151,7 +152,7 @@ public partial class FiniteLevelDirector : Node
         return metadata?.LevelMode?.Equals("Endless", StringComparison.OrdinalIgnoreCase) == true;
     }
 
-    private bool TryStartEndlessLevel()
+    private bool TryStartEndlessLevel(string levelPath)
     {
         if (_endlessDirector == null)
         {
@@ -159,13 +160,78 @@ public partial class FiniteLevelDirector : Node
             return false;
         }
 
+        var chunkPaths = ResolveChunkPaths(levelPath);
+        if (chunkPaths.Count == 0)
+        {
+            GD.PushWarning($"[FiniteLevelDirector] Endless level '{levelPath}' did not reference any chunks.");
+            return false;
+        }
+
+        var manualChunks = new List<Array<Dictionary>>();
+        var segmentTypes = new List<string>();
+        var exitSpeeds = new List<string>();
+
+        foreach (var chunk in chunkPaths)
+        {
+            var splinePoints = CurveCanvasImporter.ExtractSplineData(chunk);
+            if (splinePoints.Count == 0)
+            {
+                continue;
+            }
+
+            manualChunks.Add(splinePoints);
+            segmentTypes.Add(CurveCanvasImporter.ExtractSegmentType(chunk));
+            exitSpeeds.Add("Any");
+        }
+
+        if (manualChunks.Count == 0)
+        {
+            GD.PushWarning($"[FiniteLevelDirector] Endless level '{levelPath}' had no usable chunk data.");
+            return false;
+        }
+
+        _endlessDirector.SetManualChunks(manualChunks, segmentTypes, exitSpeeds);
+
         _trackGenerator?.Curve?.ClearPoints();
-        var spawn = Vector3.Zero;
+        var spawn = RuntimeSplineUtility.ExtractPosition(manualChunks[0], 0);
         _endlessDirector.ResetStream(spawn);
         _endlessDirector.ProcessEndlessGeneration(spawn.X);
         SpawnPlayer(spawn);
         RemoveFinishLine();
         return true;
+    }
+
+    private static List<string> ResolveChunkPaths(string levelPath)
+    {
+        var results = new List<string>();
+        if (string.IsNullOrWhiteSpace(levelPath))
+        {
+            return results;
+        }
+
+        var lower = levelPath.ToLowerInvariant();
+        if (lower.EndsWith(".curvesequence.json", StringComparison.Ordinal))
+        {
+            var sequence = CurveSequenceSerializer.Load(levelPath);
+            if (sequence == null)
+            {
+                return results;
+            }
+
+            foreach (var chunk in sequence.ChunkPaths)
+            {
+                var chunkPath = chunk?.ToString();
+                if (!string.IsNullOrWhiteSpace(chunkPath))
+                {
+                    results.Add(chunkPath);
+                }
+            }
+
+            return results;
+        }
+
+        results.Add(levelPath);
+        return results;
     }
 
     private (Vector3? startPoint, Vector3? endPoint) LoadSingleChunk(string filePath, Curve3D curve)
