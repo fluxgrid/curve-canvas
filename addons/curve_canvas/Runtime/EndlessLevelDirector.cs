@@ -20,6 +20,7 @@ public partial class EndlessLevelDirector : Node
     public float DespawnDistance { get; set; } = 100f;
 
     private readonly List<ChunkInstance> _activeChunks = new();
+    private readonly Stack<ChunkBlueprint> _prunedChunks = new();
     private readonly RandomNumberGenerator _rng = new();
     private ChunkLibrary? _chunkLibrary;
     private Vector3 _lastExitSocketPosition = Vector3.Zero;
@@ -68,8 +69,25 @@ public partial class EndlessLevelDirector : Node
                     chunk.Track.QueueFree();
                 }
 
+                if (chunk.Blueprint != null)
+                {
+                    _prunedChunks.Push(chunk.Blueprint);
+                }
+
                 _activeChunks.RemoveAt(i);
             }
+        }
+
+        // 3. BACKFILL IF THE CAMERA MOVES BACKWARD
+        var earliestEntrance = _activeChunks.Count > 0 ? _activeChunks[0].EntrancePosition.X : _streamStartPosition.X;
+        while ((playerX - earliestEntrance) < -SpawnLookahead)
+        {
+            if (!SpawnPreviousChunk())
+            {
+                break;
+            }
+
+            earliestEntrance = _activeChunks[0].EntrancePosition.X;
         }
     }
 
@@ -127,22 +145,28 @@ public partial class EndlessLevelDirector : Node
             return false;
         }
 
-        var track = InstantiateChunkTrack(splinePoints, skipFirstPoint: false, segmentType);
+        var track = InstantiateChunkTrack(splinePoints, segmentType, out var startPoint, out var lastPointVector);
         if (track == null)
         {
             return false;
         }
 
-        Vector3 lastPoint;
+        Vector3 lastPoint = lastPointVector ?? _lastExitSocketPosition;
+        Vector3 entrancePoint;
         if (manualChunk != null)
         {
             var translation = _lastExitSocketPosition - manualChunk.Entrance;
+            entrancePoint = manualChunk.Entrance + translation;
             lastPoint = manualChunk.Exit + translation;
         }
         else
         {
+            entrancePoint = startPoint ?? _lastExitSocketPosition;
             lastPoint = RuntimeSplineUtility.ExtractPosition(splinePoints, splinePoints.Count - 1);
         }
+
+        var blueprint = new ChunkBlueprint(CloneChunkPoints(splinePoints, Vector3.Zero), segmentType, exitSpeed ?? "Any");
+        blueprint.RecordBounds(entrancePoint, lastPoint);
 
         _lastExitSocketPosition = lastPoint;
 
@@ -151,11 +175,11 @@ public partial class EndlessLevelDirector : Node
             _currentSpeedState = exitSpeed;
         }
 
-        _activeChunks.Add(new ChunkInstance(track, lastPoint));
+        _activeChunks.Add(new ChunkInstance(track, entrancePoint, lastPoint, blueprint));
         return true;
     }
 
-    private TrackMeshGenerator? InstantiateChunkTrack(Array<Dictionary> points, bool skipFirstPoint, string segmentType)
+    private TrackMeshGenerator? InstantiateChunkTrack(Array<Dictionary> points, string segmentType, out Vector3? startPoint, out Vector3? lastPoint)
     {
         var track = new TrackMeshGenerator
         {
@@ -169,8 +193,10 @@ public partial class EndlessLevelDirector : Node
         }
 
         AddChild(track, true);
-        var (startPoint, lastPoint) = RuntimeSplineUtility.AppendPoints(track.Curve, points, skipFirstPoint, Vector3.Zero);
-        if (startPoint.HasValue && _activeChunks.Count == 0)
+        var appendResult = RuntimeSplineUtility.AppendPoints(track.Curve, points, skipFirstPoint: false, translation: Vector3.Zero);
+        startPoint = appendResult.firstPoint;
+        lastPoint = appendResult.lastPoint;
+        if (startPoint.HasValue && (_activeChunks.Count == 0 || startPoint.Value.X < _streamStartPosition.X))
         {
             _streamStartPosition = startPoint.Value;
         }
@@ -212,6 +238,7 @@ public partial class EndlessLevelDirector : Node
         _currentSpeedState = "Any";
         _chunkCounter = 0;
         _streamStartPosition = startPosition;
+        _prunedChunks.Clear();
     }
 
     private void ClearActiveChunks()
@@ -225,6 +252,35 @@ public partial class EndlessLevelDirector : Node
         }
 
         _activeChunks.Clear();
+    }
+
+    private bool SpawnPreviousChunk()
+    {
+        if (_prunedChunks.Count == 0)
+        {
+            return false;
+        }
+
+        var blueprint = _prunedChunks.Pop();
+        var anchorEntrance = _activeChunks.Count > 0 ? _activeChunks[0].EntrancePosition : _streamStartPosition;
+        var translation = anchorEntrance - blueprint.ExitPosition;
+        var translatedPoints = CloneChunkPoints(blueprint.Points, translation);
+        var track = InstantiateChunkTrack(translatedPoints, blueprint.SegmentType, out var startPoint, out var lastPoint);
+        if (track == null || !startPoint.HasValue || !lastPoint.HasValue)
+        {
+            return false;
+        }
+
+        var entrance = startPoint.Value;
+        var exit = lastPoint.Value;
+        _activeChunks.Insert(0, new ChunkInstance(track, entrance, exit, blueprint));
+
+        if (entrance.X < _streamStartPosition.X)
+        {
+            _streamStartPosition = entrance;
+        }
+
+        return true;
     }
 
     public Vector3 GetStreamStartPosition()
@@ -289,14 +345,40 @@ public partial class EndlessLevelDirector : Node
 
     private sealed class ChunkInstance
     {
-        public ChunkInstance(TrackMeshGenerator track, Vector3 exitPosition)
+        public ChunkInstance(TrackMeshGenerator track, Vector3 entrancePosition, Vector3 exitPosition, ChunkBlueprint blueprint)
         {
             Track = track;
+            EntrancePosition = entrancePosition;
             ExitPosition = exitPosition;
+            Blueprint = blueprint;
         }
 
         public TrackMeshGenerator Track { get; }
+        public Vector3 EntrancePosition { get; }
         public Vector3 ExitPosition { get; }
+        public ChunkBlueprint Blueprint { get; }
+    }
+
+    private sealed class ChunkBlueprint
+    {
+        public ChunkBlueprint(Array<Dictionary> points, string segmentType, string exitSpeed)
+        {
+            Points = points;
+            SegmentType = segmentType;
+            ExitSpeed = exitSpeed;
+        }
+
+        public Array<Dictionary> Points { get; }
+        public string SegmentType { get; }
+        public string ExitSpeed { get; }
+        public Vector3 EntrancePosition { get; private set; }
+        public Vector3 ExitPosition { get; private set; }
+
+        public void RecordBounds(Vector3 entrance, Vector3 exit)
+        {
+            EntrancePosition = entrance;
+            ExitPosition = exit;
+        }
     }
 
     private sealed class ManualChunk
