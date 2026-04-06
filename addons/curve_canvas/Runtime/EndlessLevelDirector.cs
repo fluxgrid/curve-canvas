@@ -151,8 +151,8 @@ public partial class EndlessLevelDirector : Node
             return false;
         }
 
-        Vector3 lastPoint = lastPointVector ?? _lastExitSocketPosition;
         Vector3 entrancePoint;
+        Vector3 lastPoint;
         if (manualChunk != null)
         {
             var translation = _lastExitSocketPosition - manualChunk.Entrance;
@@ -162,11 +162,12 @@ public partial class EndlessLevelDirector : Node
         else
         {
             entrancePoint = startPoint ?? _lastExitSocketPosition;
-            lastPoint = RuntimeSplineUtility.ExtractPosition(splinePoints, splinePoints.Count - 1);
+            lastPoint = lastPointVector ?? RuntimeSplineUtility.ExtractPosition(splinePoints, splinePoints.Count - 1);
         }
 
-        var blueprint = new ChunkBlueprint(CloneChunkPoints(splinePoints, Vector3.Zero), segmentType, exitSpeed ?? "Any");
-        blueprint.RecordBounds(entrancePoint, lastPoint);
+        var relativePoints = CloneChunkPoints(splinePoints, -entrancePoint);
+        var relativeExit = lastPoint - entrancePoint;
+        var blueprint = new ChunkBlueprint(relativePoints, segmentType, exitSpeed ?? "Any", relativeExit);
 
         _lastExitSocketPosition = lastPoint;
 
@@ -263,8 +264,8 @@ public partial class EndlessLevelDirector : Node
 
         var blueprint = _prunedChunks.Pop();
         var anchorEntrance = _activeChunks.Count > 0 ? _activeChunks[0].EntrancePosition : _streamStartPosition;
-        var translation = anchorEntrance - blueprint.ExitPosition;
-        var translatedPoints = CloneChunkPoints(blueprint.Points, translation);
+        var desiredEntrance = anchorEntrance - blueprint.ExitOffset;
+        var translatedPoints = CloneChunkPoints(blueprint.Points, desiredEntrance);
         var track = InstantiateChunkTrack(translatedPoints, blueprint.SegmentType, out var startPoint, out var lastPoint);
         if (track == null || !startPoint.HasValue || !lastPoint.HasValue)
         {
@@ -361,24 +362,18 @@ public partial class EndlessLevelDirector : Node
 
     private sealed class ChunkBlueprint
     {
-        public ChunkBlueprint(Array<Dictionary> points, string segmentType, string exitSpeed)
+        public ChunkBlueprint(Array<Dictionary> points, string segmentType, string exitSpeed, Vector3 exitOffset)
         {
             Points = points;
             SegmentType = segmentType;
             ExitSpeed = exitSpeed;
+            ExitOffset = exitOffset;
         }
 
         public Array<Dictionary> Points { get; }
         public string SegmentType { get; }
         public string ExitSpeed { get; }
-        public Vector3 EntrancePosition { get; private set; }
-        public Vector3 ExitPosition { get; private set; }
-
-        public void RecordBounds(Vector3 entrance, Vector3 exit)
-        {
-            EntrancePosition = entrance;
-            ExitPosition = exit;
-        }
+        public Vector3 ExitOffset { get; }
     }
 
     private sealed class ManualChunk
