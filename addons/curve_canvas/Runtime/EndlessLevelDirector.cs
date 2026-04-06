@@ -13,6 +13,9 @@ public partial class EndlessLevelDirector : Node
     [Export]
     public NodePath GlobalLibraryPath { get; set; } = new();
 
+    [Export(PropertyHint.TypeString, "Leave blank for a random seed each time")]
+    public string LevelSeed { get; set; } = string.Empty;
+
     [Export(PropertyHint.Range, "0,1000,1")]
     public float SpawnLookahead { get; set; } = 200f;
 
@@ -24,6 +27,7 @@ public partial class EndlessLevelDirector : Node
     private readonly Stack<ChunkBlueprint> _prunedForwardChunks = new();
     private bool _startBoundaryWarned;
     private readonly RandomNumberGenerator _rng = new();
+    private ulong _activeSeed;
     private ChunkLibrary? _chunkLibrary;
     private Vector3 _lastExitSocketPosition = Vector3.Zero;
     private string _currentSpeedState = "Any";
@@ -34,7 +38,23 @@ public partial class EndlessLevelDirector : Node
 
     public override void _Ready()
     {
-        _rng.Randomize();
+        InitializeRNG();
+    }
+
+    public void InitializeRNG()
+    {
+        if (string.IsNullOrWhiteSpace(LevelSeed))
+        {
+            _rng.Randomize();
+            _activeSeed = _rng.Seed;
+            GD.Print($"[EndlessLevelDirector] Started with RANDOM seed: {_activeSeed}");
+        }
+        else
+        {
+            _activeSeed = (ulong)LevelSeed.Hash();
+            _rng.Seed = _activeSeed;
+            GD.Print($"[EndlessLevelDirector] Started with FIXED seed: '{LevelSeed}' ({_activeSeed})");
+        }
     }
 
     /// <summary>
