@@ -127,8 +127,7 @@ public partial class EndlessLevelDirector : Node
             return false;
         }
 
-        var skipFirstPoint = _activeChunks.Count > 0;
-        var track = InstantiateChunkTrack(splinePoints, skipFirstPoint, segmentType);
+        var track = InstantiateChunkTrack(splinePoints, skipFirstPoint: false, segmentType);
         if (track == null)
         {
             return false;
