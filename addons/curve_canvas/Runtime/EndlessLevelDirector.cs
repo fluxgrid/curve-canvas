@@ -20,7 +20,8 @@ public partial class EndlessLevelDirector : Node
     public float DespawnDistance { get; set; } = 100f;
 
     private readonly List<ChunkInstance> _activeChunks = new();
-    private readonly Stack<ChunkBlueprint> _prunedChunks = new();
+    private readonly Stack<ChunkBlueprint> _prunedBackwardChunks = new();
+    private readonly Stack<ChunkBlueprint> _prunedForwardChunks = new();
     private readonly RandomNumberGenerator _rng = new();
     private ChunkLibrary? _chunkLibrary;
     private Vector3 _lastExitSocketPosition = Vector3.Zero;
@@ -58,11 +59,14 @@ public partial class EndlessLevelDirector : Node
         }
 
         // 2. PRUNE THE WAKE
-        var pruneThreshold = playerX - DespawnDistance;
+        var leftPruneThreshold = playerX - DespawnDistance;
+        var rightPruneThreshold = playerX + DespawnDistance;
         for (var i = _activeChunks.Count - 1; i >= 0; i--)
         {
             var chunk = _activeChunks[i];
-            if (chunk.ExitPosition.X < pruneThreshold)
+            var pruneLeft = chunk.ExitPosition.X < leftPruneThreshold;
+            var pruneRight = chunk.EntrancePosition.X > rightPruneThreshold;
+            if (pruneLeft || pruneRight)
             {
                 if (chunk.Track != null && IsInstanceValid(chunk.Track))
                 {
@@ -71,7 +75,15 @@ public partial class EndlessLevelDirector : Node
 
                 if (chunk.Blueprint != null)
                 {
-                    _prunedChunks.Push(chunk.Blueprint);
+                    if (pruneLeft)
+                    {
+                        _prunedBackwardChunks.Push(chunk.Blueprint);
+                    }
+
+                    if (pruneRight)
+                    {
+                        _prunedForwardChunks.Push(chunk.Blueprint);
+                    }
                 }
 
                 _activeChunks.RemoveAt(i);
@@ -80,7 +92,7 @@ public partial class EndlessLevelDirector : Node
 
         // 3. BACKFILL IF THE CAMERA MOVES BACKWARD
         var earliestEntrance = _activeChunks.Count > 0 ? _activeChunks[0].EntrancePosition.X : _streamStartPosition.X;
-        while ((playerX - earliestEntrance) < -SpawnLookahead)
+        while ((playerX - earliestEntrance) < SpawnLookahead)
         {
             if (!SpawnPreviousChunk())
             {
@@ -93,6 +105,11 @@ public partial class EndlessLevelDirector : Node
 
     private bool SpawnNextChunk(ChunkLibrary library)
     {
+        if (TrySpawnForwardHistoryChunk())
+        {
+            return true;
+        }
+
         Array<Dictionary>? splinePoints = null;
         string segmentType = "Flow";
         string? exitSpeed = null;
@@ -239,7 +256,8 @@ public partial class EndlessLevelDirector : Node
         _currentSpeedState = "Any";
         _chunkCounter = 0;
         _streamStartPosition = startPosition;
-        _prunedChunks.Clear();
+        _prunedBackwardChunks.Clear();
+        _prunedForwardChunks.Clear();
     }
 
     private void ClearActiveChunks()
@@ -257,12 +275,12 @@ public partial class EndlessLevelDirector : Node
 
     private bool SpawnPreviousChunk()
     {
-        if (_prunedChunks.Count == 0)
+        if (_prunedBackwardChunks.Count == 0)
         {
             return false;
         }
 
-        var blueprint = _prunedChunks.Pop();
+        var blueprint = _prunedBackwardChunks.Pop();
         var anchorEntrance = _activeChunks.Count > 0 ? _activeChunks[0].EntrancePosition : _streamStartPosition;
         var desiredEntrance = anchorEntrance - blueprint.ExitOffset;
         var translatedPoints = CloneChunkPoints(blueprint.Points, desiredEntrance);
@@ -282,6 +300,35 @@ public partial class EndlessLevelDirector : Node
         }
 
         return true;
+    }
+
+    private bool TrySpawnForwardHistoryChunk()
+    {
+        while (_prunedForwardChunks.Count > 0)
+        {
+            var blueprint = _prunedForwardChunks.Pop();
+            var desiredEntrance = _lastExitSocketPosition;
+            var translatedPoints = CloneChunkPoints(blueprint.Points, desiredEntrance);
+            var track = InstantiateChunkTrack(translatedPoints, blueprint.SegmentType, out var startPoint, out var lastPoint);
+            if (track == null || !startPoint.HasValue || !lastPoint.HasValue)
+            {
+                continue;
+            }
+
+            var entrance = startPoint.Value;
+            var exit = lastPoint.Value;
+            _activeChunks.Add(new ChunkInstance(track, entrance, exit, blueprint));
+            _lastExitSocketPosition = exit;
+
+            if (!string.IsNullOrWhiteSpace(blueprint.ExitSpeed))
+            {
+                _currentSpeedState = blueprint.ExitSpeed;
+            }
+
+            return true;
+        }
+
+        return false;
     }
 
     public Vector3 GetStreamStartPosition()
