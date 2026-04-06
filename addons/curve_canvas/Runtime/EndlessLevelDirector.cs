@@ -48,6 +48,16 @@ public partial class EndlessLevelDirector : Node
             return;
         }
 
+        // 0. RECALCULATE TRUE HORIZON
+        if (_activeChunks.Count > 0)
+        {
+            _lastExitSocketPosition = _activeChunks[_activeChunks.Count - 1].ExitPosition;
+        }
+        else
+        {
+            _lastExitSocketPosition = _streamStartPosition;
+        }
+
         // 1. FILL THE HORIZON
         var failSafe = 0;
         while ((_lastExitSocketPosition.X - playerX) < SpawnLookahead && failSafe < 10)
