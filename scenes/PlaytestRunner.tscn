@@ -46,7 +46,7 @@ process_mode = 4
 script = ExtResource("7_endless")
 GlobalLibraryPath = NodePath("../ChunkLibrary")
 SpawnLookahead = 200.0
-DespawnDistance = 100.0
+DespawnDistance = 400.0
 
 [node name="ExitLayer" type="CanvasLayer" parent="."]
 

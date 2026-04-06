@@ -16,12 +16,13 @@ public partial class EndlessLevelDirector : Node
     [Export(PropertyHint.Range, "0,1000,1")]
     public float SpawnLookahead { get; set; } = 200f;
 
-    [Export(PropertyHint.Range, "0,1000,1")]
-    public float DespawnDistance { get; set; } = 100f;
+    [Export(PropertyHint.Range, "0,2000,1")]
+    public float DespawnDistance { get; set; } = 400f;
 
     private readonly List<ChunkInstance> _activeChunks = new();
     private readonly Stack<ChunkBlueprint> _prunedBackwardChunks = new();
     private readonly Stack<ChunkBlueprint> _prunedForwardChunks = new();
+    private bool _startBoundaryWarned;
     private readonly RandomNumberGenerator _rng = new();
     private ChunkLibrary? _chunkLibrary;
     private Vector3 _lastExitSocketPosition = Vector3.Zero;
@@ -48,7 +49,8 @@ public partial class EndlessLevelDirector : Node
         }
 
         // 1. FILL THE HORIZON
-        while ((_lastExitSocketPosition.X - playerX) < SpawnLookahead)
+        var failSafe = 0;
+        while ((_lastExitSocketPosition.X - playerX) < SpawnLookahead && failSafe < 10)
         {
             var success = SpawnNextChunk(library);
             if (!success)
@@ -56,6 +58,7 @@ public partial class EndlessLevelDirector : Node
                 GD.PushWarning("[EndlessLevelDirector] Failed to spawn chunk. Aborting fill loop to prevent infinite hang.");
                 break;
             }
+            failSafe++;
         }
 
         // 2. PRUNE THE WAKE
@@ -258,6 +261,7 @@ public partial class EndlessLevelDirector : Node
         _streamStartPosition = startPosition;
         _prunedBackwardChunks.Clear();
         _prunedForwardChunks.Clear();
+        _startBoundaryWarned = false;
     }
 
     private void ClearActiveChunks()
@@ -277,6 +281,12 @@ public partial class EndlessLevelDirector : Node
     {
         if (_prunedBackwardChunks.Count == 0)
         {
+            if (!_startBoundaryWarned &&
+                (_activeChunks.Count == 0 || _activeChunks[0].EntrancePosition.X <= _streamStartPosition.X + 0.01f))
+            {
+                GD.PushWarning("[EndlessLevelDirector] Reached the beginning of the stream; no more chunks exist to the left.");
+                _startBoundaryWarned = true;
+            }
             return false;
         }
 
@@ -299,6 +309,7 @@ public partial class EndlessLevelDirector : Node
             _streamStartPosition = entrance;
         }
 
+        _startBoundaryWarned = false;
         return true;
     }
 

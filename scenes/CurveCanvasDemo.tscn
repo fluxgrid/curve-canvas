@@ -129,7 +129,7 @@ process_mode = 4
 script = ExtResource("14_endless")
 GlobalLibraryPath = NodePath("../ChunkLibrary")
 SpawnLookahead = 150.0
-DespawnDistance = 100.0
+DespawnDistance = 400.0
 
 [node name="LevelMetadataPanel" parent="." unique_id=950203562 groups=["CurveCanvasLevelMetadata"] instance=ExtResource("4_jm6xb")]
 offset = Vector2(0, 40)
