@@ -114,6 +114,39 @@ public partial class FiniteLevelDirector : Node
 
     private bool IsEndlessLevel(string path)
     {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return false;
+        }
+
+        var lower = path.ToLowerInvariant();
+        if (lower.EndsWith(".curvesequence.json", StringComparison.Ordinal))
+        {
+            var sequence = CurveSequenceSerializer.Load(path);
+            if (sequence == null || sequence.ChunkPaths.Count == 0)
+            {
+                return false;
+            }
+
+            foreach (var chunkVariant in sequence.ChunkPaths)
+            {
+                var chunkPath = chunkVariant?.ToString();
+                if (string.IsNullOrWhiteSpace(chunkPath))
+                {
+                    continue;
+                }
+
+                if (IsEndlessLevel(chunkPath))
+                {
+                    return true;
+                }
+
+                // If one chunk says finite, keep checking others just in case
+            }
+
+            return false;
+        }
+
         var metadata = CurveCanvasImporter.ExtractMetadata(path);
         return metadata?.LevelMode?.Equals("Endless", StringComparison.OrdinalIgnoreCase) == true;
     }

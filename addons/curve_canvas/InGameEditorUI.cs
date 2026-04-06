@@ -805,7 +805,8 @@ public partial class InGameEditorUI : CanvasLayer
             return false;
         }
 
-        var json = CurveCanvasExporter.SerializeCanvasToString(_sceneRoot);
+        var overrides = BuildMetadataOverrides(_metadataPanel);
+        var json = CurveCanvasExporter.SerializeCanvasToString(_sceneRoot, overrides);
         if (string.IsNullOrEmpty(json))
         {
             return false;
@@ -870,7 +871,8 @@ public partial class InGameEditorUI : CanvasLayer
             return null;
         }
 
-        var json = CurveCanvasExporter.SerializeCanvasToString(_sceneRoot);
+        var overrides = BuildMetadataOverrides(_metadataPanel);
+        var json = CurveCanvasExporter.SerializeCanvasToString(_sceneRoot, overrides);
         if (string.IsNullOrEmpty(json))
         {
             return null;
