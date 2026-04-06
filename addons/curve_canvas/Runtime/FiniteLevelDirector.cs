@@ -113,6 +113,34 @@ public partial class FiniteLevelDirector : Node
         SpawnFinishLine(endPoint.Value);
     }
 
+    public override void _Process(double delta)
+    {
+        base._Process(delta);
+        if (!_isEndlessLevel || _endlessDirector == null)
+        {
+            return;
+        }
+
+        var focusX = GetStreamingFocusX();
+        _endlessDirector.ProcessEndlessGeneration(focusX);
+    }
+
+    private float GetStreamingFocusX()
+    {
+        var viewportCamera = GetViewport()?.GetCamera3D();
+        if (viewportCamera != null && IsInstanceValid(viewportCamera))
+        {
+            return viewportCamera.GlobalTransform.Origin.X;
+        }
+
+        if (_playerInstance != null && IsInstanceValid(_playerInstance))
+        {
+            return _playerInstance.GlobalPosition.X;
+        }
+
+        return 0f;
+    }
+
     private bool IsEndlessLevel(string path)
     {
         if (string.IsNullOrWhiteSpace(path))

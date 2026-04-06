@@ -90,7 +90,6 @@ public partial class InGameEditorUI : CanvasLayer
     private bool _sequenceModeActive;
     private bool _freehandModeActive;
     private bool _playtestActive;
-    private bool _useEndlessPlaytest;
     private PackedScene? _playtestCameraScene;
     private Camera3D? _playtestCameraInstance;
     private Camera3D? _editorCamera;
@@ -142,18 +141,6 @@ public partial class InGameEditorUI : CanvasLayer
         }
 
         GetViewport()?.SetInputAsHandled();
-    }
-
-    public override void _Process(double delta)
-    {
-        base._Process(delta);
-        if (!_playtestActive || !_useEndlessPlaytest)
-        {
-            return;
-        }
-
-        var cameraX = _playtestCameraInstance?.GlobalPosition.X ?? 0f;
-        _endlessDirector?.ProcessEndlessGeneration(cameraX);
     }
 
     private void InitializeAfterSceneReady()
@@ -687,25 +674,16 @@ public partial class InGameEditorUI : CanvasLayer
             return;
         }
 
-        _useEndlessPlaytest = IsEndlessLevel();
-
         if (!CapturePlaytestSnapshot())
         {
             GD.PushWarning("[InGameEditorUI] Unable to capture playtest snapshot.");
             return;
         }
 
-        if (_useEndlessPlaytest)
+        var runtimePath = BuildRuntimeLevelPath();
+        if (!string.IsNullOrEmpty(runtimePath))
         {
-            StartEndlessPlaytest();
-        }
-        else
-        {
-            var runtimePath = BuildRuntimeLevelPath();
-            if (!string.IsNullOrEmpty(runtimePath))
-            {
-                _finiteDirector?.LoadLevel(runtimePath);
-            }
+            _finiteDirector?.LoadLevel(runtimePath);
         }
 
         ToggleEditorVisibility(false);
@@ -735,12 +713,6 @@ public partial class InGameEditorUI : CanvasLayer
         {
             _playtestCameraInstance.QueueFree();
             _playtestCameraInstance = null;
-        }
-
-        if (_useEndlessPlaytest)
-        {
-            _endlessDirector?.ResetStream(Vector3.Zero);
-            _endlessDirector?.ClearManualChunks();
         }
 
         RestorePlaytestSnapshot();
@@ -850,19 +822,6 @@ public partial class InGameEditorUI : CanvasLayer
         }
 
         return chunkPath;
-    }
-
-    private void StartEndlessPlaytest()
-    {
-        if (_endlessDirector == null)
-        {
-            GD.PushWarning("[InGameEditorUI] EndlessLevelDirector was not found; cannot start endless playtest.");
-            return;
-        }
-
-        var spawn = DeterminePlaytestSpawnPosition();
-        _endlessDirector.ResetStream(spawn);
-        _endlessDirector.ProcessEndlessGeneration(spawn.X);
     }
 
     private string? CreateTemporaryChunkFromScene()
@@ -1160,13 +1119,6 @@ public partial class InGameEditorUI : CanvasLayer
         var nextType = index == 1 ? "Rail" : "Flow";
         _primaryTrackGenerator.SetSegmentType(nextType);
     }
-
-    private bool IsEndlessLevel()
-    {
-        var mode = _metadataPanel?.LevelMode ?? "Finite";
-        return mode.Equals("Endless", StringComparison.OrdinalIgnoreCase);
-    }
-
 
     private void EnsurePlaytestButtons()
     {
