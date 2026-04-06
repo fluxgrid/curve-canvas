@@ -26,5 +26,6 @@
     {"id": 37, "name": "Implement UV Coordinate Generation for Seamless Texture Tiling on the Track Mesh."},
     {"id": 38, "name": "Fix Flow mesh geometry to drop vertices straight down vertically for a solid terrain profile."},
     {"id": 39, "name": "Implement Runtime Level Directors: Finite (Single Map Load) and Endless (Procedural Spawning)."},
-    {"id": 40, "name": "Implement Editor Freecam Playtest Mode and Level Select Browser UI."}
+    {"id": 40, "name": "Implement Editor Freecam Playtest Mode and Level Select Browser UI."},
+    {"id": 41, "name": "Fix Endless Level Routing and Runtime Triggers for Playtest and Standalone modes."}
 ]
