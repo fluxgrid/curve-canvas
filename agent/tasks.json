@@ -32,5 +32,6 @@
     {"id": 43, "name": "Fix backfill math and implement Bidirectional Pruning with a forward history stack."},
     {"id": 44, "name": "Resolve EndlessLevelDirector Tug-of-War and tune sliding window bounds."},
     {"id": 45, "name": "Fix stale horizon tracking in EndlessLevelDirector after bidirectional pruning."},
-    {"id": 46, "name": "Implement Deterministic String-Based Seeding for the EndlessLevelDirector."}
+    {"id": 46, "name": "Implement Deterministic String-Based Seeding for the EndlessLevelDirector."},
+    {"id": 47, "name": "Refactor Flow mesh geometry to use a relative terrain depth to prevent inverted meshes."}
 ]
