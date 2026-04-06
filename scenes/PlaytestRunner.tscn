@@ -6,9 +6,19 @@
 [ext_resource type="Material" path="res://materials/RailTrackMaterial.tres" id="4_rail"]
 [ext_resource type="PackedScene" path="res://scenes/PlaytestCamera.tscn" id="5_camera"]
 [ext_resource type="Script" path="res://addons/curve_canvas/Runtime/ReturnToMenuButton.cs" id="6_exit"]
+[ext_resource type="Script" path="res://addons/curve_canvas/Runtime/EndlessLevelDirector.cs" id="7_endless"]
+[ext_resource type="Script" path="res://addons/curve_canvas/Chunks/ChunkLibrary.cs" id="8_chunklib"]
+[ext_resource type="Script" path="res://addons/curve_canvas/Chunks/AuthoredChunkDefinition.cs" id="9_chunkdef"]
 
 [sub_resource type="Curve3D" id="Curve3D_play"]
 bake_interval = 0.5
+
+[sub_resource type="Resource" id="AuthoredChunk_Default"]
+script = ExtResource("9_chunkdef")
+JsonFilePath = "user://Levels/default_level.curvecanvas.json"
+SegmentType = "Flow"
+RequiredEntrySpeed = "Any"
+ExitSpeed = "Any"
 
 [node name="PlaytestRunner" type="Node3D"]
 
@@ -24,7 +34,19 @@ RailMaterial = ExtResource("4_rail")
 [node name="FiniteLevelDirector" type="Node" parent="."]
 script = ExtResource("2_director")
 TrackGeneratorPath = NodePath("../TrackGenerator")
+EndlessDirectorPath = NodePath("../EndlessLevelDirector")
 PlayerScene = ExtResource("5_camera")
+
+[node name="ChunkLibrary" type="Node" parent="."]
+script = ExtResource("8_chunklib")
+AvailableChunks = [SubResource("AuthoredChunk_Default")]
+
+[node name="EndlessLevelDirector" type="Node" parent="."]
+process_mode = 4
+script = ExtResource("7_endless")
+GlobalLibraryPath = NodePath("../ChunkLibrary")
+SpawnLookahead = 200.0
+DespawnDistance = 100.0
 
 [node name="ExitLayer" type="CanvasLayer" parent="."]
 

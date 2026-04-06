@@ -14,7 +14,7 @@ public partial class EndlessLevelDirector : Node
     public NodePath GlobalLibraryPath { get; set; } = new();
 
     [Export(PropertyHint.Range, "0,1000,1")]
-    public float SpawnLookahead { get; set; } = 150f;
+    public float SpawnLookahead { get; set; } = 200f;
 
     [Export(PropertyHint.Range, "0,1000,1")]
     public float DespawnDistance { get; set; } = 100f;
@@ -45,15 +45,32 @@ public partial class EndlessLevelDirector : Node
             return;
         }
 
+        // 1. FILL THE HORIZON
         while ((_lastExitSocketPosition.X - playerX) < SpawnLookahead)
         {
-            if (!SpawnNextChunk(library))
+            var success = SpawnNextChunk(library);
+            if (!success)
             {
+                GD.PushWarning("[EndlessLevelDirector] Failed to spawn chunk. Aborting fill loop to prevent infinite hang.");
                 break;
             }
         }
 
-        DespawnTrailingChunks(playerX);
+        // 2. PRUNE THE WAKE
+        var pruneThreshold = playerX - DespawnDistance;
+        for (var i = _activeChunks.Count - 1; i >= 0; i--)
+        {
+            var chunk = _activeChunks[i];
+            if (chunk.ExitPosition.X < pruneThreshold)
+            {
+                if (chunk.Track != null && IsInstanceValid(chunk.Track))
+                {
+                    chunk.Track.QueueFree();
+                }
+
+                _activeChunks.RemoveAt(i);
+            }
+        }
     }
 
     private bool SpawnNextChunk(ChunkLibrary library)
@@ -165,23 +182,6 @@ public partial class EndlessLevelDirector : Node
         }
 
         return track;
-    }
-
-    private void DespawnTrailingChunks(float playerX)
-    {
-        var threshold = playerX - DespawnDistance;
-        for (var i = 0; i < _activeChunks.Count;)
-        {
-            var chunk = _activeChunks[i];
-            if (chunk.ExitPosition.X < threshold)
-            {
-                chunk.Track.QueueFree();
-                _activeChunks.RemoveAt(i);
-                continue;
-            }
-
-            break;
-        }
     }
 
     private ChunkLibrary? ResolveLibrary()
